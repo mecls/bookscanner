@@ -629,42 +629,40 @@ async def extract_and_summarize(file: UploadFile = File(...)):
         # Search for the book
         book_data = search_google_books(cleaned_text, book_info)
         
-        if book_data:
-            logger.info(f"Found book: {book_data['title']} by {book_data['authors']}")
-            result = {
-                "summary": book_data['description'],
-                "title": book_data['title'],
-                "authors": book_data['authors'],
-                "image": book_data['image']
-            }
-        else:
-            logger.info("Book not found, falling back to LLM")
-            # Fallback to LLM with more context
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "gemma2",
-                    "prompt": f"""Based on the following text extracted from a book cover, provide a concise summary (max 3 sentences) that answers these key questions:
-1. What is the main story/theme?
-2. What is the key message or lesson?
-3. Who would enjoy this book?
+        # Always use LLM for summary, even if book_data is found
+        logger.info(f"Generating summary with LLM for book: {book_data['title'] if book_data else 'Unknown'}")
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "gemma2",
+                "prompt": f'''Extract the most important, actionable key points from the following book. 
+Summarize in 4-7 short bullet points (one per line). 
+Each point should be concise, direct, and help a reader instantly understand what makes this book unique or useful. 
+Do NOT write a paragraph. Do NOT include an introduction or conclusion. 
+Just the key points, like a cheat sheet.
 
 Extracted Text: {cleaned_text}
 
 Book Information:
-Title: {book_info.get('title', 'Unknown')}
-Author: {book_info.get('author', 'Unknown')}
+Title: {book_data['title'] if book_data else book_info.get('title', 'Unknown')}
+Author: {', '.join(book_data['authors']) if book_data and book_data.get('authors') else book_info.get('author', 'Unknown')}
 ISBN: {book_info.get('isbn', 'Unknown')}
 
-Summary:""",
-                    "stream": False,
-                },
-            )
-            result = {"summary": response.json()["response"]}
-        
+Key Points:
+''',
+                "stream": False,
+            },
+        )
+        summary = response.json()["response"]
+        result = {
+            "summary": summary,
+            "title": book_data['title'] if book_data else book_info.get('title', 'Unknown'),
+            "authors": book_data['authors'] if book_data and book_data.get('authors') else [],
+            "image": book_data['image'] if book_data and book_data.get('image') else None,
+            "rating": book_data['rating'] if book_data and book_data.get('rating') is not None else None
+        }
         # Cache the result
         save_to_cache(cache_key, result)
-        
         return JSONResponse(content=result)
 
     except Exception as e:

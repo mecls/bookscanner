@@ -5,7 +5,11 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useBooksStore } from '../store/books';
 import SummaryModal from './SummaryModal';
 
-export default function ImagePickerE() {
+interface AccessCameraProps {
+    setLoading?: (loading: boolean) => void;
+}
+
+export default function ImagePickerE({ setLoading }: AccessCameraProps) {
     const [image, setImage] = useState<string | undefined>(undefined);
     const [summary, setSummary] = useState<string | null>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
@@ -22,19 +26,23 @@ export default function ImagePickerE() {
             type: "image/jpeg",
         } as any);
 
-        const res = await fetch("http://192.168.5.37:8000/extract_and_summarize", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        });
-        if (!res.ok) {
-            throw new Error("Failed to upload image");
+        if (setLoading) setLoading(true);
+        try {
+            const res = await fetch("http://192.168.5.37:8000/extract_and_summarize", {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            });
+            if (!res.ok) {
+                throw new Error("Failed to upload image");
+            }
+            const json = await res.json();
+            return json;
+        } finally {
+            if (setLoading) setLoading(false);
         }
-
-        const json = await res.json();
-        return json;
     };
 
     const pickImage = async () => {

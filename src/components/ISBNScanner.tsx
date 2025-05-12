@@ -5,7 +5,11 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useBooksStore } from '../store/books';
 import SummaryModal from './SummaryModal';
 
-export default function ISBNScanner() {
+interface ISBNScannerProps {
+    setLoading?: (loading: boolean) => void;
+}
+
+export default function ISBNScanner({ setLoading }: ISBNScannerProps) {
     const [summary, setSummary] = useState<string | null>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
     const [authors, setAuthors] = useState<string[] | undefined>(undefined);
@@ -24,6 +28,7 @@ export default function ISBNScanner() {
 
         if (!result.canceled) {
             try {
+                if (setLoading) setLoading(true);
                 // Here you would typically use a barcode scanning library
                 // For now, we'll just use the image for book cover recognition
                 const formData = new FormData();
@@ -63,6 +68,8 @@ export default function ISBNScanner() {
                 });
             } catch (error) {
                 console.error('Error processing image:', error);
+            } finally {
+                if (setLoading) setLoading(false);
             }
         }
     };
