@@ -1,44 +1,60 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { createContext, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/src/components/HapticTab';
 import { IconSymbol } from '@/src/components/ui/IconSymbol';
-import TabBarBackground from '@/src/components/ui/TabBarBackground';
 import { useColorScheme } from '@/src/hooks/useColorScheme';
+
+export type ColorMode = 'salmon' | 'blue';
+export const ColorModeContext = createContext<{
+  colorMode: ColorMode;
+  setColorMode: (mode: ColorMode) => void;
+}>({ colorMode: 'salmon', setColorMode: () => {} });
+
+const SALMON = '#F08080';
+const LIGHT_BLUE = '#7EC8E3';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [colorMode, setColorMode] = useState<ColorMode>('salmon');
+  const activeColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#F08080', // Light Coral color
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    <ColorModeContext.Provider value={{ colorMode, setColorMode }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: activeColor, // Use context color
+          headerShown: false,
+          tabBarButton: HapticTab,
+          tabBarStyle: Platform.select({
+            ios: {
+              backgroundColor: '#fff',
+              position: 'absolute',
+            },
+            android: {
+              backgroundColor: '#fff',
+            },
+            default: {
+              backgroundColor: '#fff',
+            },
+          }),
+        }}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="gallery"
+          options={{
+            title: 'Gallery',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
+          }}
+        />
+      </Tabs>
+    </ColorModeContext.Provider>
   );
 }

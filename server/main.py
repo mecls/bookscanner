@@ -34,9 +34,12 @@ CACHE_DIR = Path("cache")
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_EXPIRY_DAYS = 30  # Cache results for 30 days
 
-def get_cache_key(image_data: bytes) -> str:
-    """Generate a unique cache key for an image."""
-    return hashlib.md5(image_data).hexdigest()
+def get_cache_key(title: str, authors: str = None) -> str:
+    """Generate a unique cache key for a book."""
+    key = f"{title.lower()}"
+    if authors:
+        key += f"_{authors.lower()}"
+    return hashlib.md5(key.encode()).hexdigest()
 
 def get_cached_result(cache_key: str) -> Optional[Dict]:
     """Retrieve cached result if it exists and is not expired."""
@@ -578,6 +581,65 @@ def calculate_similarity(str1: str, str2: str) -> float:
     """Calculate similarity between two strings using fuzzy matching."""
     return fuzz.token_sort_ratio(str1, str2) / 100.0
 
+# Define related categories and their connections
+CATEGORY_RELATIONSHIPS = {
+    'self-help': ['philosophy', 'psychology', 'business', 'biography'],
+    'philosophy': ['self-help', 'psychology', 'religion', 'biography'],
+    'psychology': ['self-help', 'philosophy', 'science', 'biography'],
+    'business': ['self-help', 'economics', 'biography', 'history'],
+    'biography': ['history', 'self-help', 'philosophy', 'psychology'],
+    'history': ['biography', 'politics', 'philosophy', 'religion'],
+    'science': ['technology', 'philosophy', 'psychology', 'education'],
+    'technology': ['science', 'business', 'education', 'philosophy'],
+    'religion': ['philosophy', 'spirituality', 'history', 'biography'],
+    'spirituality': ['religion', 'philosophy', 'self-help', 'psychology'],
+    'fiction': ['literature', 'poetry', 'drama', 'fantasy'],
+    'fantasy': ['fiction', 'science fiction', 'horror', 'young adult'],
+    'science fiction': ['fantasy', 'science', 'technology', 'fiction'],
+    'mystery': ['thriller', 'fiction', 'crime', 'horror'],
+    'thriller': ['mystery', 'crime', 'fiction', 'horror'],
+    'romance': ['fiction', 'drama', 'young adult', 'literature'],
+    'poetry': ['literature', 'fiction', 'drama', 'philosophy'],
+    'drama': ['fiction', 'poetry', 'literature', 'romance'],
+    'young adult': ['fantasy', 'fiction', 'romance', 'science fiction'],
+    'children': ['education', 'young adult', 'fiction', 'fantasy'],
+    'education': ['science', 'children', 'psychology', 'technology'],
+    'art': ['design', 'photography', 'architecture', 'history'],
+    'music': ['art', 'biography', 'history', 'education'],
+    'cookbook': ['food', 'lifestyle', 'health', 'education'],
+    'travel': ['geography', 'history', 'biography', 'photography'],
+    'health': ['science', 'self-help', 'education', 'lifestyle'],
+    'lifestyle': ['health', 'self-help', 'cookbook', 'travel'],
+    'politics': ['history', 'economics', 'philosophy', 'biography'],
+    'economics': ['business', 'politics', 'history', 'philosophy'],
+    'crime': ['mystery', 'thriller', 'fiction', 'biography'],
+    'horror': ['fantasy', 'mystery', 'thriller', 'fiction'],
+    'design': ['art', 'technology', 'architecture', 'photography'],
+    'photography': ['art', 'design', 'travel', 'education'],
+    'architecture': ['art', 'design', 'history', 'photography'],
+    'geography': ['travel', 'history', 'science', 'education'],
+    'food': ['cookbook', 'lifestyle', 'health', 'education']
+}
+
+def get_related_categories(categories):
+    """Get related categories based on the input categories."""
+    related = set()
+    for category in categories:
+        category_lower = category.lower()
+        # Find the best matching category from our relationships
+        best_match = None
+        best_score = 0
+        for known_category in CATEGORY_RELATIONSHIPS.keys():
+            score = fuzz.token_sort_ratio(category_lower, known_category)
+            if score > best_score:
+                best_score = score
+                best_match = known_category
+        
+        if best_match and best_score > 80:  # Only use if we have a good match
+            related.update(CATEGORY_RELATIONSHIPS[best_match])
+    
+    return list(related)
+
 @app.post("/extract_and_summarize")
 async def extract_and_summarize(file: UploadFile = File(...)):
     try:
@@ -718,6 +780,143 @@ async def search_by_isbn(isbn: str):
         
     except Exception as e:
         logger.error(f"Error searching by ISBN: {str(e)}", exc_info=True)
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
+@app.get("/similar_books")
+async def get_similar_books(title: str, authors: str = None):
+    try:
+        # Check cache first
+        cache_key = get_cache_key(title, authors)
+        cached_result = get_cached_result(cache_key)
+        if cached_result:
+            logger.info(f"Cache hit for similar books: {title}")
+            return cached_result
+
+        # If not in cache, proceed with API call
+        initial_query = f'intitle:"{title}"'
+        if authors:
+            initial_query += f' inauthor:"{authors}"'
+        
+        url = f"https://www.googleapis.com/books/v1/volumes?q={initial_query}&maxResults=1"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('items'):
+                current_book = data['items'][0]['volumeInfo']
+                categories = current_book.get('categories', [])
+                
+                # If no categories found, try to extract from description
+                if not categories and current_book.get('description'):
+                    common_categories = list(CATEGORY_RELATIONSHIPS.keys())
+                    description = current_book['description'].lower()
+                    found_categories = []
+                    for category in common_categories:
+                        if category in description:
+                            found_categories.append(category)
+                    
+                    if found_categories:
+                        categories = found_categories
+
+                # Get related categories
+                related_categories = get_related_categories(categories) if categories else []
+                
+                # Search for similar books using multiple queries
+                same_category_books = []
+                related_category_books = []
+                seen_titles = set()
+                
+                # First try with related categories
+                for category in related_categories:
+                    if len(related_category_books) >= 5:
+                        break
+                    
+                    query = f'subject:"{category}"'
+                    url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=10"
+                    response = requests.get(url)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('items'):
+                            for item in data['items']:
+                                book = item['volumeInfo']
+                                book_title = book.get('title', '').lower()
+                                
+                                if book_title in seen_titles or book_title == title.lower():
+                                    continue
+                                
+                                if authors and book.get('authors'):
+                                    if any(author.lower() in authors.lower() for author in book['authors']):
+                                        continue
+                                
+                                related_category_books.append({
+                                    'title': book.get('title', ''),
+                                    'authors': book.get('authors', []),
+                                    'image': book.get('imageLinks', {}).get('thumbnail', ''),
+                                    'rating': book.get('averageRating', None),
+                                    'categories': book.get('categories', []),
+                                    'match_type': 'related_category'
+                                })
+                                seen_titles.add(book_title)
+                
+                # Then try with original categories
+                for category in categories:
+                    if len(same_category_books) >= 5:
+                        break
+                    
+                    query = f'subject:"{category}"'
+                    url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=10"
+                    response = requests.get(url)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('items'):
+                            for item in data['items']:
+                                book = item['volumeInfo']
+                                book_title = book.get('title', '').lower()
+                                
+                                if book_title in seen_titles or book_title == title.lower():
+                                    continue
+                                
+                                if authors and book.get('authors'):
+                                    if any(author.lower() in authors.lower() for author in book['authors']):
+                                        continue
+                                
+                                same_category_books.append({
+                                    'title': book.get('title', ''),
+                                    'authors': book.get('authors', []),
+                                    'image': book.get('imageLinks', {}).get('thumbnail', ''),
+                                    'rating': book.get('averageRating', None),
+                                    'categories': book.get('categories', []),
+                                    'match_type': 'same_category'
+                                })
+                                seen_titles.add(book_title)
+                
+                # Sort each list by rating
+                same_category_books.sort(key=lambda x: x['rating'] if x['rating'] else 0, reverse=True)
+                related_category_books.sort(key=lambda x: x['rating'] if x['rating'] else 0, reverse=True)
+                
+                # Combine the lists, taking top 5 from each
+                similar_books = (
+                    same_category_books[:5] + 
+                    related_category_books[:5]
+                )
+                
+                # Cache the result
+                save_to_cache(cache_key, similar_books)
+                
+                return similar_books
+        
+        return JSONResponse(
+            content={"error": "No similar books found"},
+            status_code=404
+        )
+        
+    except Exception as e:
+        logger.error(f"Error finding similar books: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": str(e)},
             status_code=500

@@ -7,9 +7,10 @@ import SummaryModal from './SummaryModal';
 
 interface ImagePickerEProps {
     setLoading?: (loading: boolean) => void;
+    buttonColor?: string;
 }
 
-export default function ImagePickerE({ setLoading }: ImagePickerEProps) {
+export default function ImagePickerE({ setLoading, buttonColor = '#F08080' }: ImagePickerEProps) {
     const [image, setImage] = useState<string | undefined>(undefined);
     const [summary, setSummary] = useState<string | null>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
@@ -79,9 +80,9 @@ export default function ImagePickerE({ setLoading }: ImagePickerEProps) {
     };
     return (
         <View style={styles.container}>
-            <View style={{ backgroundColor: '#D9D9D9', width: 60, height: 60, alignItems: 'center', justifyContent: 'center', borderRadius: 30, opacity: 0.7 }}>
+            <View style={[styles.buttonContainer, { backgroundColor: buttonColor }]}> 
                 <TouchableOpacity onPress={pickImage}>
-                    <FontAwesome name="photo" size={24} color="black" />
+                    <FontAwesome name="photo" size={24} color="white" />
                 </TouchableOpacity>
             </View>
 
@@ -109,6 +110,18 @@ const styles = StyleSheet.create({
         flex: 0,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    buttonContainer: {
+        backgroundColor: '#F08080',
+        width: 50,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
     }
 });
-

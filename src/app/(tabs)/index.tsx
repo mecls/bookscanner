@@ -5,16 +5,22 @@ import ISBNScanner from '@/src/components/ISBNScanner';
 import ScansComp from '@/src/components/ScansComp';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
-import React, { useState } from 'react';
-import { Image as RNImage, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useContext } from 'react';
+import { Image as RNImage, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ColorModeContext } from './_layout';
 
 const BOOK_IMAGE = require('@/assets/images/book.png'); // Place a book icon in assets/images/book.png
 
+const SALMON = '#F08080';
+const LIGHT_BLUE = '#7EC8E3';
+
 export default function HomeScreen() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = React.useState(false);
   const bounce = useSharedValue(0);
+  const { colorMode, setColorMode } = useContext(ColorModeContext);
 
   React.useEffect(() => {
     if (loading) {
@@ -35,27 +41,47 @@ export default function HomeScreen() {
     transform: [{ translateY: bounce.value }],
   }));
 
+  const buttonColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
+
   return (
-    <SafeAreaView style={{ flex: 1, marginTop: 50, margin: 20, backgroundColor: 'transparent' }}>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title" style={{ color: 'black' }}>Hi, Mecls1</ThemedText>
-        <HelloWave />
-      </ThemedView>
+    <SafeAreaView style={{ flex: 1, marginTop: 40, margin: 20, backgroundColor: 'transparent' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <ThemedView style={styles.titleContainer}>
+          <ThemedText type="title" style={{ color: 'black' }}>Hi, Mecls1</ThemedText>
+          <HelloWave />
+        </ThemedView>
+        <TouchableOpacity
+          onPress={() => setColorMode(colorMode === 'salmon' ? 'blue' : 'salmon')}
+          style={{ padding: 8 }}
+          accessibilityLabel="Toggle button color"
+        >
+          <Ionicons name="color-palette" size={28} color={buttonColor} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.stepContainer}>
         <ThemedText type="subtitle" style={{ color: 'black' }}>Your last scans</ThemedText>
         <ScansComp />
       </View>
       <ThemedView style={styles.stepContainer2}>
         <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
-          <ImagePicker setLoading={setLoading} />
-          <AccessCamera setLoading={setLoading} />
-          <ISBNScanner setLoading={setLoading} />
+          <View style={styles.iconContainer}>
+            <ImagePicker setLoading={setLoading} buttonColor={buttonColor} />
+            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>Gallery</ThemedText>
+          </View>
+          <View style={styles.iconContainer}>
+            <ISBNScanner setLoading={setLoading} buttonColor={buttonColor} />
+            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>ISBN</ThemedText>
+          </View>
+          <View style={styles.iconContainer}>
+            <AccessCamera setLoading={setLoading} buttonColor={buttonColor} />
+            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>Camera</ThemedText>
+          </View>
         </View>
       </ThemedView>
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
           <Animated.View style={[styles.bounceBook, animatedStyle]}>
-            <RNImage source={BOOK_IMAGE} style={{ width: 100, height: 120 }} resizeMode="contain" />
+            <RNImage source={BOOK_IMAGE} style={{ width: 100, height: 120 }} resizeMode="cover" />
           </Animated.View>
           <ThemedText style={styles.loadingText}>Finding your book and summary...</ThemedText>
         </View>
@@ -72,16 +98,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepContainer: {
-    flex:2,
+    flex: 2,
     marginTop: 40,
     backgroundColor: 'transparent',
     gap: 8,
   },
   stepContainer2: {
-    marginBottom:100,
+    marginBottom: 80,
     backgroundColor: 'transparent',
     gap: 8,
     alignSelf: 'center',
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconLabel: {
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#333',
   },
   reactLogo: {
     height: 178,
@@ -111,3 +147,5 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+
+

@@ -7,9 +7,10 @@ import SummaryModal from './SummaryModal';
 
 interface AccessCameraProps {
     setLoading?: (loading: boolean) => void;
+    buttonColor?: string;
 }
 
-export default function ImagePickerE({ setLoading }: AccessCameraProps) {
+export default function ImagePickerE({ setLoading, buttonColor = '#F08080' }: AccessCameraProps) {
     const [image, setImage] = useState<string | undefined>(undefined);
     const [summary, setSummary] = useState<string | null>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
@@ -79,11 +80,13 @@ export default function ImagePickerE({ setLoading }: AccessCameraProps) {
     };
     return (
         <View style={styles.container}>
-            <View style={{ backgroundColor: '#D9D9D9', width: 60, height: 60, alignItems: 'center', justifyContent: 'center', borderRadius: 30, opacity: 0.7 }}>
-                <TouchableOpacity onPress={pickImage}>
-                    <AntDesign name="camera" size={35} color="black" />
-                </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+                style={[styles.buttonContainer, { backgroundColor: buttonColor }]}
+                onPress={pickImage}
+                activeOpacity={0.7}
+            >
+                <AntDesign name="camera" size={24} color="white" />
+            </TouchableOpacity>
 
             <SummaryModal
                 visible={modalVisible}
@@ -109,5 +112,18 @@ const styles = StyleSheet.create({
         flex: 0,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    buttonContainer: {
+        backgroundColor: '#F08080',
+        width: 50,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
     }
 });          

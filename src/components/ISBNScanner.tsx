@@ -7,9 +7,10 @@ import SummaryModal from './SummaryModal';
 
 interface ISBNScannerProps {
     setLoading?: (loading: boolean) => void;
+    buttonColor?: string;
 }
 
-export default function ISBNScanner({ setLoading }: ISBNScannerProps) {
+export default function ISBNScanner({ setLoading, buttonColor = '#F08080' }: ISBNScannerProps) {
     const [summary, setSummary] = useState<string | null>(null);
     const [title, setTitle] = useState<string | undefined>(undefined);
     const [authors, setAuthors] = useState<string[] | undefined>(undefined);
@@ -76,14 +77,13 @@ export default function ISBNScanner({ setLoading }: ISBNScannerProps) {
 
     return (
         <View style={styles.container}>
-            <View style={styles.scannerButton}>
-                <TouchableOpacity 
-                    onPress={pickImage}
-                    style={styles.button}
-                >
-                    <FontAwesome name="barcode" size={24} color="black" />
-                </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+                style={[styles.buttonContainer, { backgroundColor: buttonColor }]}
+                onPress={pickImage}
+                activeOpacity={0.7}
+            >
+                <FontAwesome name="barcode" size={34} color="white" />
+            </TouchableOpacity>
 
             <SummaryModal
                 visible={modalVisible}
@@ -110,16 +110,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    scannerButton: {
-        backgroundColor: '#D9D9D9',
+    buttonContainer: {
+        backgroundColor: '#F08080',
         width: 60,
         height: 60,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 30,
-        opacity: 0.7,
-    },
-    button: {
-        padding: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
     }
 }); 

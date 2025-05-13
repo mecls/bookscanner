@@ -1,5 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import SimilarBooks from './SimilarBooks';
 import { ThemedText } from './ThemedText';
 
 interface SummaryModalProps {
@@ -12,7 +14,37 @@ interface SummaryModalProps {
     rating?: number;
 }
 
+interface SimilarBook {
+    title: string;
+    authors: string[];
+    image: string;
+    rating?: number;
+}
+
 export default function SummaryModal({title, authors, image, visible, summary, onClose, rating }: SummaryModalProps) {
+    const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
+
+    useEffect(() => {
+        if (visible && title) {
+            // Fetch similar books when modal opens
+            const fetchSimilarBooks = async () => {
+                try {
+                    const authorsParam = authors ? authors.join(',') : '';
+                    const response = await fetch(
+                        `http://192.168.5.37:8000/similar_books?title=${encodeURIComponent(title)}&authors=${encodeURIComponent(authorsParam)}`
+                    );
+                    if (response.ok) {
+                        const data = await response.json();
+                        setSimilarBooks(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching similar books:', error);
+                }
+            };
+            fetchSimilarBooks();
+        }
+    }, [visible, title, authors]);
+
     return (
         <Modal
             animationType="slide"
@@ -72,6 +104,7 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                         <ThemedText style={styles.modalText}>
                             {summary}
                         </ThemedText>
+                        <SimilarBooks books={similarBooks} />
                     </ScrollView>
                 </View>
             </View>
@@ -137,7 +170,7 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     modalText: {
-        marginBottom: 15,
+        marginTop: 10,
         textAlign: 'left',
         color: 'black',
         width: '100%',
