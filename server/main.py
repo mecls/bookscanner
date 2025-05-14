@@ -716,8 +716,18 @@ Key Points:
             },
         )
         summary = response.json()["response"]
+        
+        # Format summary to use arrows
+        lines = summary.splitlines()
+        formatted_lines = []
+        for line in lines:
+            stripped = line.lstrip('-•*0123456789. ').strip()
+            if stripped:
+                formatted_lines.append(f'• {stripped}')
+        formatted_summary = '\n'.join(formatted_lines)
+        
         result = {
-            "summary": summary,
+            "summary": formatted_summary,
             "title": book_data['title'] if book_data else book_info.get('title', 'Unknown'),
             "authors": book_data['authors'] if book_data and book_data.get('authors') else [],
             "image": book_data['image'] if book_data and book_data.get('image') else None,

@@ -1,6 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useBooksStore } from '../store/books';
 import SimilarBooks from './SimilarBooks';
 import { ThemedText } from './ThemedText';
 
@@ -23,6 +24,9 @@ interface SimilarBook {
 
 export default function SummaryModal({title, authors, image, visible, summary, onClose, rating }: SummaryModalProps) {
     const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
+    const addGalleryBook = useBooksStore((state) => state.addGalleryBook);
+    const galleryBooks = useBooksStore((state) => state.galleryBooks);
+    const [added, setAdded] = useState(false);
 
     useEffect(() => {
         if (visible && title) {
@@ -43,7 +47,21 @@ export default function SummaryModal({title, authors, image, visible, summary, o
             };
             fetchSimilarBooks();
         }
-    }, [visible, title, authors]);
+        // Check if book is already in gallery
+        setAdded(!!galleryBooks.find(b => b.title === title && JSON.stringify(b.authors) === JSON.stringify(authors)));
+    }, [visible, title, authors, galleryBooks]);
+
+    function handleAddToGallery() {
+        if (!added && title) {
+            addGalleryBook({
+                id: Date.now().toString(),
+                title: title,
+                image: image || '',
+                authors: authors || [],
+            });
+            setAdded(true);
+        }
+    }
 
     return (
         <Modal
@@ -82,7 +100,6 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                                 By {authors.join(', ')}
                             </ThemedText>
                         )}
-                        
                         {typeof rating === 'number' ? (
                             <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 10 }}>
                                 {[1,2,3,4,5].map((i) => (
@@ -100,7 +117,16 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                                 No rating
                             </ThemedText>
                         )}
-                        
+                             <TouchableOpacity
+                            style={[styles.addButton, added && styles.addedButton]}
+                            onPress={handleAddToGallery}
+                            disabled={added}
+                        >
+                            <FontAwesome name={added ? 'check' : 'plus'} size={18} color={added ? '#fff' : '#fff'} />
+                            <ThemedText style={styles.addButtonText}>
+                                {added ? 'Added to Gallery' : 'Add to Gallery'}
+                            </ThemedText>
+                        </TouchableOpacity>
                         <ThemedText style={styles.modalText}>
                             {summary}
                         </ThemedText>
@@ -174,5 +200,26 @@ const styles = StyleSheet.create({
         textAlign: 'left',
         color: 'black',
         width: '100%',
+    },
+    addButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F08080',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+        marginTop: 10,
+        alignSelf: 'center',
+        gap: 8,
+    },
+    addedButton: {
+        backgroundColor: '#7EC8E3',
+    },
+    addButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        marginLeft: 8,
     },
 });

@@ -75,7 +75,7 @@ export default function SimilarBooks({ books }: SimilarBooksProps) {
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 20,
+        marginTop: 50,
         width: '100%',
     },
     title: {
