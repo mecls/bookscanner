@@ -47,9 +47,7 @@ export default function GalleryScreen() {
   );
 
   function updateBookStatus(id: string, status: Book['status']) {
-    setGalleryBooks((state: any) => ({
-      galleryBooks: state.galleryBooks.map((b: Book) => b.id === id ? { ...b, status } : b)
-    }));
+    useBooksStore.getState().updateBookStatus(id, status);
   }
 
   async function handleAddBook() {
