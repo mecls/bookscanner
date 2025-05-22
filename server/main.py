@@ -1,8 +1,9 @@
 import io
 import pytesseract
 import requests
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import re
 import cv2
@@ -17,6 +18,10 @@ import time
 from dotenv import load_dotenv
 from fuzzywuzzy import fuzz
 import logging
+import aiohttp
+import difflib
+from pydantic import BaseModel
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +29,15 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()  # Load environment variables from .env file
 app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize Google Cloud Vision client
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -33,6 +47,11 @@ google_vision_client = vision.ImageAnnotatorClient() if GOOGLE_APPLICATION_CREDE
 CACHE_DIR = Path("cache")
 CACHE_DIR.mkdir(exist_ok=True)
 CACHE_EXPIRY_DAYS = 30  # Cache results for 30 days
+
+class BookInfo(BaseModel):
+    isbn: Optional[str] = None
+    title: Optional[str] = None
+    author: Optional[str] = None
 
 def get_cache_key(title: str, authors: str = None) -> str:
     """Generate a unique cache key for a book."""
@@ -505,77 +524,171 @@ def search_open_library(book_info: Dict[str, Optional[str]]) -> Optional[Dict]:
     
     return None
 
-def search_google_books(text: str, book_info: Dict[str, Optional[str]]) -> Optional[Dict]:
-    """Enhanced Google Books API search with better matching and logging."""
-    search_attempts = []
-    
-    # Try ISBN first (most accurate)
-    if book_info.get('isbn'):
-        isbn = book_info['isbn'].replace('-', '')
-        search_attempts.append(('isbn', f'isbn:{isbn}'))
-    
-    # Try exact title and author match
-    if book_info.get('title') and book_info.get('author'):
-        search_attempts.append(('title+author', f'intitle:"{book_info["title"]}" inauthor:"{book_info["author"]}"'))
-    
-    # Try title with partial author match
-    if book_info.get('title') and book_info.get('author'):
-        author_parts = book_info['author'].split()
-        if len(author_parts) > 1:
-            search_attempts.append(('title+partial_author', f'intitle:"{book_info["title"]}" inauthor:"{author_parts[0]}"'))
-    
-    # Try title only with quotes for exact match
-    if book_info.get('title'):
-        search_attempts.append(('exact_title', f'intitle:"{book_info["title"]}"'))
-        # Also try without quotes for partial match
-        search_attempts.append(('partial_title', f'intitle:{book_info["title"]}'))
-    
-    # Try author only with quotes for exact match
-    if book_info.get('author'):
-        search_attempts.append(('exact_author', f'inauthor:"{book_info["author"]}"'))
-        # Also try without quotes for partial match
-        search_attempts.append(('partial_author', f'inauthor:{book_info["author"]}'))
-    
-    # Try text search as last resort
-    search_attempts.append(('text', text))
-    
-    logger.info(f"Book info extracted: {book_info}")
-    
-    best_result = None
-    best_score = 0
-    
-    for search_type, query in search_attempts:
-        logger.info(f"Trying search with {search_type}: {query}")
-        url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=5"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('items'):
-                # Get the best match from the results
-                best_match, match_score = find_best_match(data['items'], book_info)
-                logger.info(f"Best match score: {match_score} for search type: {search_type}")
-                
-                if best_match and match_score > best_score:
-                    best_score = match_score
-                    book = best_match['volumeInfo']
-                    best_result = {
-                    'title': book.get('title', ''),
-                    'authors': book.get('authors', []),
-                    'description': book.get('description', ''),
-                    'image': book.get('imageLinks', {}).get('thumbnail', ''),
-                    'rating': book.get('averageRating', None),  # <-- add this line
-                    'match_score': match_score,
-                    'source': 'google_books'
-                    }
-                        
-    # If Google Books search fails or returns low confidence results, try Open Library
-    if not best_result or best_score < 15:
-        logger.info("Google Books search failed or returned low confidence, trying Open Library")
-        open_library_result = search_open_library(book_info)
-        if open_library_result:
-            return open_library_result
-    
-    return best_result
+@app.post("/search_book")
+async def search_book(book_info: BookInfo):
+    try:
+        # Search for the book
+        book_data = await search_google_books(book_info.isbn, book_info.title, book_info.author)
+        
+        if not book_data:
+            raise HTTPException(status_code=404, detail="Book not found")
+        
+        return book_data
+    except Exception as e:
+        logger.error(f"Error searching book: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/similar_books")
+async def get_similar_books(title: str, authors: str = ""):
+    try:
+        # Search for similar books using Google Books API
+        url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}"
+        if authors:
+            url += f"+inauthor:{authors}"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("items"):
+                        # Get up to 5 similar books
+                        similar_books = []
+                        for item in data["items"][:5]:
+                            book = item.get("volumeInfo", {})
+                            similar_books.append({
+                                "title": book.get("title"),
+                                "authors": book.get("authors", []),
+                                "image": book.get("imageLinks", {}).get("thumbnail"),
+                                "rating": book.get("averageRating")
+                            })
+                        return similar_books
+        
+        return []
+    except Exception as e:
+        logger.error(f"Error getting similar books: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def search_google_books(isbn: str = None, title: str = None, author: str = None):
+    """Search for a book using Google Books API with fallback to Open Library"""
+    try:
+        # Try Google Books API first
+        if isbn:
+            url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
+        elif title and author:
+            url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}+inauthor:{author}"
+        elif title:
+            url = f"https://www.googleapis.com/books/v1/volumes?q=intitle:{title}"
+        else:
+            return None
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("totalItems", 0) > 0:
+                        # Get the best match
+                        best_match = None
+                        best_score = 0
+                        for item in data.get("items", []):
+                            book = item.get("volumeInfo", {})
+                            score = 0
+                            
+                            # Score based on ISBN match
+                            if isbn and book.get("industryIdentifiers"):
+                                for identifier in book["industryIdentifiers"]:
+                                    if identifier.get("identifier") == isbn:
+                                        score += 100
+                                        break
+                            
+                            # Score based on title match
+                            if title and book.get("title"):
+                                title_similarity = difflib.SequenceMatcher(None, title.lower(), book["title"].lower()).ratio()
+                                score += title_similarity * 50
+                            
+                            # Score based on author match
+                            if author and book.get("authors"):
+                                author_similarity = max(
+                                    difflib.SequenceMatcher(None, author.lower(), a.lower()).ratio()
+                                    for a in book["authors"]
+                                )
+                                score += author_similarity * 50
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_match = book
+
+                        if best_match:
+                            # Try to get page count from multiple sources
+                            page_count = None
+                            
+                            # 1. Try Google Books API
+                            if best_match.get("pageCount"):
+                                page_count = best_match["pageCount"]
+                            
+                            # 2. Try Open Library API
+                            if not page_count and isbn:
+                                open_library_url = f"https://openlibrary.org/isbn/{isbn}.json"
+                                async with session.get(open_library_url) as ol_response:
+                                    if ol_response.status == 200:
+                                        ol_data = await ol_response.json()
+                                        if ol_data.get("number_of_pages"):
+                                            page_count = ol_data["number_of_pages"]
+                            
+                            # 3. Try Google Books API with different query
+                            if not page_count and title:
+                                alt_url = f"https://www.googleapis.com/books/v1/volumes?q={title}&maxResults=1"
+                                async with session.get(alt_url) as alt_response:
+                                    if alt_response.status == 200:
+                                        alt_data = await alt_response.json()
+                                        if alt_data.get("items"):
+                                            alt_book = alt_data["items"][0].get("volumeInfo", {})
+                                            if alt_book.get("pageCount"):
+                                                page_count = alt_book["pageCount"]
+
+                            return {
+                                "title": best_match.get("title"),
+                                "authors": best_match.get("authors", []),
+                                "description": best_match.get("description"),
+                                "image": best_match.get("imageLinks", {}).get("thumbnail"),
+                                "rating": best_match.get("averageRating"),
+                                "match_score": best_score,
+                                "source": "google_books",
+                                "pageCount": page_count
+                            }
+
+        # If Google Books API fails, try Open Library
+        if isbn:
+            open_library_url = f"https://openlibrary.org/isbn/{isbn}.json"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(open_library_url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data:
+                            # Get author details
+                            author_key = data.get("authors", [{}])[0].get("key")
+                            author_name = "Unknown"
+                            if author_key:
+                                author_url = f"https://openlibrary.org{author_key}.json"
+                                async with session.get(author_url) as author_response:
+                                    if author_response.status == 200:
+                                        author_data = await author_response.json()
+                                        author_name = author_data.get("name", "Unknown")
+
+                            return {
+                                "title": data.get("title"),
+                                "authors": [author_name],
+                                "description": data.get("description", ""),
+                                "image": f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg",
+                                "rating": None,
+                                "match_score": 100,
+                                "source": "open_library",
+                                "pageCount": data.get("number_of_pages")
+                            }
+
+        return None
+    except Exception as e:
+        logger.error(f"Error searching books: {str(e)}")
+        return None
 
 def calculate_similarity(str1: str, str2: str) -> float:
     """Calculate similarity between two strings using fuzzy matching."""
@@ -689,7 +802,7 @@ async def extract_and_summarize(file: UploadFile = File(...)):
         logger.info(f"Extracted book info: {book_info}")
         
         # Search for the book
-        book_data = search_google_books(cleaned_text, book_info)
+        book_data = await search_google_books(book_info.get('isbn'), book_info.get('title'), book_info.get('author'))
         
         # Always use LLM for summary, even if book_data is found
         logger.info(f"Generating summary with LLM for book: {book_data['title'] if book_data else 'Unknown'}")
@@ -790,143 +903,6 @@ async def search_by_isbn(isbn: str):
         
     except Exception as e:
         logger.error(f"Error searching by ISBN: {str(e)}", exc_info=True)
-        return JSONResponse(
-            content={"error": str(e)},
-            status_code=500
-        )
-
-@app.get("/similar_books")
-async def get_similar_books(title: str, authors: str = None):
-    try:
-        # Check cache first
-        cache_key = get_cache_key(title, authors)
-        cached_result = get_cached_result(cache_key)
-        if cached_result:
-            logger.info(f"Cache hit for similar books: {title}")
-            return cached_result
-
-        # If not in cache, proceed with API call
-        initial_query = f'intitle:"{title}"'
-        if authors:
-            initial_query += f' inauthor:"{authors}"'
-        
-        url = f"https://www.googleapis.com/books/v1/volumes?q={initial_query}&maxResults=1"
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('items'):
-                current_book = data['items'][0]['volumeInfo']
-                categories = current_book.get('categories', [])
-                
-                # If no categories found, try to extract from description
-                if not categories and current_book.get('description'):
-                    common_categories = list(CATEGORY_RELATIONSHIPS.keys())
-                    description = current_book['description'].lower()
-                    found_categories = []
-                    for category in common_categories:
-                        if category in description:
-                            found_categories.append(category)
-                    
-                    if found_categories:
-                        categories = found_categories
-
-                # Get related categories
-                related_categories = get_related_categories(categories) if categories else []
-                
-                # Search for similar books using multiple queries
-                same_category_books = []
-                related_category_books = []
-                seen_titles = set()
-                
-                # First try with related categories
-                for category in related_categories:
-                    if len(related_category_books) >= 5:
-                        break
-                    
-                    query = f'subject:"{category}"'
-                    url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=10"
-                    response = requests.get(url)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('items'):
-                            for item in data['items']:
-                                book = item['volumeInfo']
-                                book_title = book.get('title', '').lower()
-                                
-                                if book_title in seen_titles or book_title == title.lower():
-                                    continue
-                                
-                                if authors and book.get('authors'):
-                                    if any(author.lower() in authors.lower() for author in book['authors']):
-                                        continue
-                                
-                                related_category_books.append({
-                                    'title': book.get('title', ''),
-                                    'authors': book.get('authors', []),
-                                    'image': book.get('imageLinks', {}).get('thumbnail', ''),
-                                    'rating': book.get('averageRating', None),
-                                    'categories': book.get('categories', []),
-                                    'match_type': 'related_category'
-                                })
-                                seen_titles.add(book_title)
-                
-                # Then try with original categories
-                for category in categories:
-                    if len(same_category_books) >= 5:
-                        break
-                    
-                    query = f'subject:"{category}"'
-                    url = f"https://www.googleapis.com/books/v1/volumes?q={query}&maxResults=10"
-                    response = requests.get(url)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('items'):
-                            for item in data['items']:
-                                book = item['volumeInfo']
-                                book_title = book.get('title', '').lower()
-                                
-                                if book_title in seen_titles or book_title == title.lower():
-                                    continue
-                                
-                                if authors and book.get('authors'):
-                                    if any(author.lower() in authors.lower() for author in book['authors']):
-                                        continue
-                                
-                                same_category_books.append({
-                                    'title': book.get('title', ''),
-                                    'authors': book.get('authors', []),
-                                    'image': book.get('imageLinks', {}).get('thumbnail', ''),
-                                    'rating': book.get('averageRating', None),
-                                    'categories': book.get('categories', []),
-                                    'match_type': 'same_category'
-                                })
-                                seen_titles.add(book_title)
-                
-                # Sort each list by rating
-                same_category_books.sort(key=lambda x: x['rating'] if x['rating'] else 0, reverse=True)
-                related_category_books.sort(key=lambda x: x['rating'] if x['rating'] else 0, reverse=True)
-                
-                # Combine the lists, taking top 5 from each
-                similar_books = (
-                    same_category_books[:5] + 
-                    related_category_books[:5]
-                )
-                
-                # Cache the result
-                save_to_cache(cache_key, similar_books)
-                
-                return similar_books
-        
-        return JSONResponse(
-            content={"error": "No similar books found"},
-            status_code=404
-        )
-        
-    except Exception as e:
-        logger.error(f"Error finding similar books: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": str(e)},
             status_code=500

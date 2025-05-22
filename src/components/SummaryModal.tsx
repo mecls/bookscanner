@@ -1,6 +1,7 @@
 import { FontAwesome } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
 import { useEffect, useState } from 'react';
-import { Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Modal, Platform, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useBooksStore } from '../store/books';
 import SimilarBooks from './SimilarBooks';
 import { ThemedText } from './ThemedText';
@@ -13,6 +14,7 @@ interface SummaryModalProps {
     image?: string;
     onClose: () => void;
     rating?: number;
+    pageCount?: number;
 }
 
 interface SimilarBook {
@@ -22,7 +24,7 @@ interface SimilarBook {
     rating?: number;
 }
 
-export default function SummaryModal({title, authors, image, visible, summary, onClose, rating }: SummaryModalProps) {
+export default function SummaryModal({title, authors, image, visible, summary, onClose, rating, pageCount }: SummaryModalProps) {
     const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
     const addGalleryBook = useBooksStore((state) => state.addGalleryBook);
     const galleryBooks = useBooksStore((state) => state.galleryBooks);
@@ -58,8 +60,52 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                 title: title,
                 image: image || '',
                 authors: authors || [],
+                yearRead: new Date().getFullYear(),
+                readingProgress: pageCount ? {
+                    currentPage: 0,
+                    totalPages: pageCount,
+                    percentage: 0,
+                    lastUpdated: new Date().toISOString(),
+                    readingTime: 0
+                } : undefined
             });
             setAdded(true);
+        }
+    }
+
+    async function handleShareBook(book: { title?: string; authors?: string[]; image?: string }) {
+        try {
+            if (book.image) {
+                // Download the image to a local file
+                const fileUri = FileSystem.cacheDirectory + 'book-share.jpg';
+                const downloadResumable = FileSystem.createDownloadResumable(
+                    book.image,
+                    fileUri
+                );
+                const result = await downloadResumable.downloadAsync();
+                if (!result) {
+                    throw new Error('Image download failed');
+                }
+                const { uri } = result;
+
+                // Use the native share sheet with the local file
+                if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                    await Share.share({
+                        url: uri,
+                        message: `Check out this book: "${book.title}"${book.authors && book.authors.length > 0 ? ` by ${book.authors.join(', ')}` : ''}`,
+                    });
+                } else {
+                    // Fallback for web or unsupported platforms
+                    Alert.alert('Sharing not supported on this platform');
+                }
+            } else {
+                // Fallback to text-only sharing if no image
+                await Share.share({
+                    message: `Check out this book: "${book.title}"${book.authors && book.authors.length > 0 ? ` by ${book.authors.join(', ')}` : ''}`,
+                });
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Could not share the book.');
         }
     }
 
@@ -74,6 +120,9 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                 <View style={styles.modalView}>
                     <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                         <FontAwesome name="close" size={24} color="black" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.fabShare} onPress={() => handleShareBook({ title, authors, image })}>
+                        <FontAwesome name="share-alt" size={24} color="#fff" />
                     </TouchableOpacity>
                     
                     <ScrollView 
@@ -117,7 +166,8 @@ export default function SummaryModal({title, authors, image, visible, summary, o
                                 No rating
                             </ThemedText>
                         )}
-                             <TouchableOpacity
+                             
+                        <TouchableOpacity
                             style={[styles.addButton, added && styles.addedButton]}
                             onPress={handleAddToGallery}
                             disabled={added}
@@ -221,5 +271,22 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         marginLeft: 8,
+    },
+    fabShare: {
+        position: 'absolute',
+        bottom: 24,
+        right: 24,
+        backgroundColor: '#F08080',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
+        zIndex: 2,
     },
 });

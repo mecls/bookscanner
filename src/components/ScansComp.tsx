@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring } from 'react-native-reanimated';
 import { useBooksStore } from '../store/books';
 import { ThemedText } from './ThemedText';
@@ -8,6 +8,7 @@ const EMPTY_BOOK_IMAGE = require('@/assets/images/book.png');
 
 export default function ScansComp() {
     const scannedBooks = useBooksStore((state) => state.scannedBooks);
+    const clearScannedBooks = useBooksStore((state) => state.clearScannedBooks);
     const bounce = useSharedValue(0);
 
     React.useEffect(() => {
@@ -45,31 +46,36 @@ export default function ScansComp() {
     }
 
     return (
-        <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ paddingHorizontal: 10 }}
-        >
-            {scannedBooks.map((book) => (
-                <View key={book.id} style={styles.card}>
-                    {book.image ? (
-                        <Image 
-                            source={{ uri: book.image }} 
-                            style={styles.bookCover}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <View style={[styles.imagePlaceholder, { backgroundColor: '#ECE59B' }]} />
-                    )}
-                    <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
-                    {book.authors && (
-                        <Text style={styles.author} numberOfLines={1}>
-                            {book.authors.join(', ')}
-                        </Text>
-                    )}
-                </View>
-            ))}
-        </ScrollView>
+        <View>
+            <TouchableOpacity onPress={clearScannedBooks} style={{ alignSelf: 'flex-end', marginBottom: 8, backgroundColor: '#F08080', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>Clear Scans</Text>
+            </TouchableOpacity>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ paddingHorizontal: 10 }}
+            >
+                {scannedBooks.map((book) => (
+                    <View key={book.id} style={styles.card}>
+                        {book.image ? (
+                            <Image 
+                                source={{ uri: book.image }} 
+                                style={styles.bookCover}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <View style={[styles.imagePlaceholder, { backgroundColor: '#ECE59B' }]} />
+                        )}
+                        <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
+                        {book.authors && (
+                            <Text style={styles.author} numberOfLines={1}>
+                                {book.authors.join(', ')}
+                            </Text>
+                        )}
+                    </View>
+                ))}
+            </ScrollView>
+        </View>
     );
 }
 
@@ -129,5 +135,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
         textAlign: 'center',
-    }
+    },
+    stepContainer: {
+        padding: 10,
+        marginBottom: 10,
+    },
 });

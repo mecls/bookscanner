@@ -1,10 +1,12 @@
+import NoteTaker from '@/src/components/NoteTaker';
 import { ThemedText } from '@/src/components/ThemedText';
-import { Book, useBooksStore } from '@/src/store/books';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Book, ReadingProgress, useBooksStore } from '@/src/store/books';
+import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import React, { useCallback, useContext, useState } from 'react';
-import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { Alert, FlatList, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ColorModeContext } from './_layout';
 
 const EMPTY_BOOK_IMAGE = require('@/assets/images/book.png');
@@ -14,8 +16,9 @@ const LIGHT_BLUE = '#7EC8E3';
 const STATUS_OPTIONS = [
   { key: 'read', label: 'Read', icon: <Ionicons name="checkmark-done-circle" size={22} color="#3498db" /> },
   { key: 'to-read', label: 'To Read', icon: <Ionicons name="eye" size={22} color="#b59f3b" /> },
-  { key: 'amazing', label: 'Amazing', icon: <MaterialCommunityIcons name="star-circle" size={22} color="#4CAF50" /> },
-  { key: 'horrible', label: 'Horrible', icon: <MaterialCommunityIcons name="alert-circle" size={22} color="#e74c3c" /> },
+  { key: 'amazing', label: 'Amazing', icon: <MaterialCommunityIcons name="heart" size={22} color="#F44336" /> },
+  { key: 'horrible', label: 'Horrible', icon: <MaterialCommunityIcons name="emoticon-poop" size={22} color="#795548" /> },
+  { key: 'dnf', label: 'DNF', icon: <MaterialCommunityIcons name="book-off" size={22} color="#9E9E9E" /> },
 ];
 
 export default function GalleryScreen() {
@@ -27,6 +30,16 @@ export default function GalleryScreen() {
   const { colorMode } = useContext(ColorModeContext);
   const fabColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
   const [statusModal, setStatusModal] = useState<{ visible: boolean; bookId?: string }>({ visible: false });
+  const [bookDetailModal, setBookDetailModal] = useState<{ visible: boolean; book?: Book }>({ visible: false });
+  const [selectedStatus, setSelectedStatus] = useState<Book['status'] | null>(null);
+  const [showNoteTaker, setShowNoteTaker] = useState(false);
+  const [hasExistingNote, setHasExistingNote] = useState(false);
+  const updateReadingProgress = useBooksStore((state) => state.updateReadingProgress);
+  const [showProgressInput, setShowProgressInput] = useState(false);
+  const [currentPage, setCurrentPage] = useState('');
+  const [totalPages, setTotalPages] = useState('');
+  const [readingTime, setReadingTime] = useState('');
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
   // Add button in header
   useFocusEffect(
@@ -45,6 +58,12 @@ export default function GalleryScreen() {
       });
     }, [navigation])
   );
+
+  useEffect(() => {
+    if (selectedBook?.readingProgress) {
+      setTotalPages(selectedBook.readingProgress.totalPages.toString());
+    }
+  }, [selectedBook]);
 
   function updateBookStatus(id: string, status: Book['status']) {
     useBooksStore.getState().updateBookStatus(id, status);
@@ -95,16 +114,24 @@ export default function GalleryScreen() {
   function renderStatusIcon(status: Book['status']) {
     switch (status) {
       case 'read':
-        return <Ionicons name="checkmark-done-circle" size={22} color="#3498db" style={styles.statusIcon} />;
+        return <Ionicons name="checkmark-done-circle" size={25} color="#3498db" style={styles.statusIcon} />;
       case 'to-read':
-        return <Ionicons name="eye" size={22} color="#b59f3b" style={styles.statusIcon} />;
+        return <Ionicons name="eye" size={25} color="#b59f3b" style={styles.statusIcon} />;
       case 'amazing':
-        return <MaterialCommunityIcons name="star-circle" size={22} color="#4CAF50" style={styles.statusIcon} />;
+        return <MaterialCommunityIcons name="heart" size={25} color="#F44336" style={styles.statusIcon} />;
       case 'horrible':
-        return <MaterialCommunityIcons name="alert-circle" size={22} color="#e74c3c" style={styles.statusIcon} />;
+        return <MaterialCommunityIcons name="emoticon-poop" size={22} color="#795548" style={styles.statusIcon} />;
+      case 'dnf':
+        return <MaterialCommunityIcons name="book-off" size={25} color="#9E9E9E" style={styles.statusIcon}/>;
       default:
         return null;
     }
+  }
+
+  async function checkForExistingNote(bookId: string) {
+    const storageKey = `book-note-${bookId}`;
+    const note = await AsyncStorage.getItem(storageKey);
+    setHasExistingNote(!!note);
   }
 
   function renderBook({ item }: { item: Book }) {
@@ -112,7 +139,11 @@ export default function GalleryScreen() {
       <TouchableOpacity
         style={styles.card}
         onLongPress={() => handleRemoveBook(item.id)}
-        onPress={() => setStatusModal({ visible: true, bookId: item.id })}
+        onPress={async () => {
+          setShowNoteTaker(false);
+          setSelectedBook(item);
+          await checkForExistingNote(item.id);
+        }}
         activeOpacity={0.8}
       >
         <View style={styles.statusIconContainer}>{renderStatusIcon(item.status || 'to-read')}</View>
@@ -129,6 +160,43 @@ export default function GalleryScreen() {
     );
   }
 
+  function handleShareBook(book: Book) {
+    let message = `Check out this book: "${book.title}"`;
+    if (book.authors && book.authors.length > 0) message += ` by ${book.authors.join(', ')}`;
+    if (book.image) message += `\n${book.image}`;
+    Share.share({ message });
+  }
+
+  function handleUpdateProgress() {
+    if (!currentPage || !totalPages) {
+      Alert.alert('Error', 'Please fill in both current page and total pages');
+      return;
+    }
+
+    const currentPageNum = parseInt(currentPage);
+    const totalPagesNum = parseInt(totalPages);
+    const readingTimeNum = parseInt(readingTime) || 0;
+
+    if (currentPageNum > totalPagesNum) {
+      Alert.alert('Error', 'Current page cannot be greater than total pages');
+      return;
+    }
+
+    if (selectedBook) {
+      const progress: ReadingProgress = {
+        currentPage: currentPageNum,
+        totalPages: totalPagesNum,
+        percentage: Math.round((currentPageNum / totalPagesNum) * 100),
+        lastUpdated: new Date().toISOString(),
+        readingTime: readingTimeNum
+      };
+      updateReadingProgress(selectedBook.id, progress);
+      setShowProgressInput(false);
+      setCurrentPage('');
+      setReadingTime('');
+    }
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent', padding: 10 }}>
       {galleryBooks.length === 0 ? (
@@ -138,8 +206,25 @@ export default function GalleryScreen() {
         </View>
       ) : (
         <View style={{ flex: 1, backgroundColor: 'transparent', marginTop: 60, marginLeft: 0 }}>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.filterButton, !selectedStatus && styles.filterButtonSelected]}
+              onPress={() => setSelectedStatus(null)}
+            >
+              <Ionicons name="apps" size={20} color={!selectedStatus ? "#fff" : "#888"} />
+            </TouchableOpacity>
+            {STATUS_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterButton, selectedStatus === opt.key && styles.filterButtonSelected]}
+                onPress={() => setSelectedStatus(opt.key as Book['status'])}
+              >
+                {React.cloneElement(opt.icon, { size: 20, color: selectedStatus === opt.key ? "#fff" : "#888" })}
+              </TouchableOpacity>
+            ))}
+          </View>
           <FlatList
-            data={galleryBooks}
+            data={selectedStatus ? galleryBooks.filter(b => b.status === selectedStatus) : galleryBooks}
             renderItem={renderBook}
             keyExtractor={(item) => item.id}
             numColumns={3}
@@ -183,6 +268,157 @@ export default function GalleryScreen() {
             <Pressable style={styles.statusCancel} onPress={() => setStatusModal({ visible: false })}>
               <Text style={styles.statusCancelText}>Cancel</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={!!selectedBook}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedBook(null)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setSelectedBook(null)}
+            >
+              <FontAwesome name="close" size={24} color="black" />
+            </TouchableOpacity>
+
+            {selectedBook && (
+              <ScrollView style={styles.modalScroll}>
+                <Image
+                  source={{ uri: selectedBook.image }}
+                  style={styles.modalImage}
+                />
+                <ThemedText style={styles.modalTitle}>
+                  {selectedBook.title}
+                </ThemedText>
+                <ThemedText style={styles.modalAuthor}>
+                  {selectedBook.authors?.join(', ') || 'Unknown Author'}
+                </ThemedText>
+
+                <View style={styles.statusPickerRow}>
+                  {STATUS_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.statusOption,
+                        selectedBook.status === opt.key && styles.statusOptionSelected
+                      ]}
+                      onPress={() => updateBookStatus(selectedBook.id, opt.key as Book['status'])}
+                    >
+                      {opt.icon}
+                      <Text style={styles.statusOptionLabel}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {!selectedBook.readingProgress && !showProgressInput && (
+                  <TouchableOpacity 
+                    style={styles.updateProgressButton}
+                    onPress={() => setShowProgressInput(true)}
+                  >
+                    <ThemedText style={styles.updateProgressButtonText}>
+                      Start Reading
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+
+                {(selectedBook.readingProgress || showProgressInput) && (
+                  <View style={styles.progressSection}>
+                    {selectedBook.readingProgress && !showProgressInput && (
+                      <View>
+                        <View style={styles.progressBar}>
+                          <View 
+                            style={[
+                              styles.progressFill,
+                              { width: `${selectedBook.readingProgress.percentage}%` }
+                            ]} 
+                          />
+                        </View>
+                        <ThemedText style={styles.progressText}>
+                          {selectedBook.readingProgress.currentPage}/{selectedBook.readingProgress.totalPages} pages ({selectedBook.readingProgress.percentage}%)
+                        </ThemedText>
+                        <ThemedText style={styles.progressText}>
+                          Reading time: {selectedBook.readingProgress.readingTime} minutes
+                        </ThemedText>
+                        <TouchableOpacity 
+                          style={styles.updateProgressButton}
+                          onPress={() => setShowProgressInput(true)}
+                        >
+                          <ThemedText style={styles.updateProgressButtonText}>
+                            Update Progress
+                          </ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {showProgressInput && (
+                      <View style={styles.progressInputContainer}>
+                        <TextInput
+                          style={styles.progressInput}
+                          placeholder="Current page"
+                          value={currentPage}
+                          onChangeText={setCurrentPage}
+                          keyboardType="numeric"
+                        />
+                        <TextInput
+                          style={styles.progressInput}
+                          placeholder="Total pages"
+                          value={totalPages}
+                          onChangeText={setTotalPages}
+                          keyboardType="numeric"
+                        />
+                        <TextInput
+                          style={styles.progressInput}
+                          placeholder="Reading time (minutes)"
+                          value={readingTime}
+                          onChangeText={setReadingTime}
+                          keyboardType="numeric"
+                        />
+                        <View style={styles.progressInputButtons}>
+                          <TouchableOpacity 
+                            style={[styles.progressInputButton, styles.cancelButton]}
+                            onPress={() => setShowProgressInput(false)}
+                          >
+                            <ThemedText style={styles.progressInputButtonText}>
+                              Cancel
+                            </ThemedText>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.progressInputButton, styles.saveButton]}
+                            onPress={handleUpdateProgress}
+                          >
+                            <ThemedText style={styles.progressInputButtonText}>
+                              Save
+                            </ThemedText>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity 
+                  style={styles.noteButton}
+                  onPress={() => setShowNoteTaker(!showNoteTaker)}
+                >
+                  <FontAwesome name="sticky-note" size={16} color="#fff" />
+                  <ThemedText style={styles.noteButtonText}>
+                    {showNoteTaker ? 'Hide Note' : (hasExistingNote ? 'View Note' : 'Write Note')}
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {showNoteTaker && (
+                  <NoteTaker 
+                    bookKey={selectedBook.id} 
+                    onNoteStatusChange={setHasExistingNote}
+                  />
+                )}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
@@ -249,8 +485,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
+    color: '#666',
   },
   fab: {
     position: 'absolute',
@@ -288,20 +524,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: '#222',
   },
-  statusOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    width: '100%',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  statusOptionLabel: {
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#222',
-  },
   statusCancel: {
     marginTop: 10,
     padding: 8,
@@ -312,5 +534,177 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     marginRight: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    padding: 10,
+    zIndex: 1,
+  },
+  modalScroll: {
+    width: '100%',
+  },
+  modalImage: {
+    width: 150,
+    height: 225,
+    borderRadius: 10,
+    marginBottom: 15,
+    alignSelf: 'center',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalAuthor: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  progressSection: {
+    marginVertical: 15,
+    padding: 10,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#eee',
+    borderRadius: 2,
+    marginTop: 5,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#F08080',
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  updateProgressButton: {
+    backgroundColor: '#F08080',
+    padding: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  updateProgressButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  progressInputContainer: {
+    marginTop: 10,
+  },
+  progressInput: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  progressInputButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  progressInputButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#ddd',
+  },
+  saveButton: {
+    backgroundColor: '#F08080',
+  },
+  progressInputButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    gap: 4,
+  },
+  filterButton: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#eee',
+    marginHorizontal: 1,
+  },
+  filterButtonSelected: {
+    backgroundColor: '#F08080',
+  },
+  noteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F08080',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginVertical: 8,
+    gap: 6,
+    alignSelf: 'center',
+  },
+  noteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  statusPickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 10,
+    marginLeft:10,
+    gap: 5,
+  },
+  statusOption: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 10,
+    marginHorizontal: 2,
+    backgroundColor: 'transparent',
+  },
+  statusOptionSelected: {
+    backgroundColor: '#E0E0E0',
+  },
+  statusOptionLabel: {
+    fontSize: 10,
+    color: '#222',
+    marginTop: 2,
   },
 });

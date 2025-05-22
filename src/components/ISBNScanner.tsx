@@ -17,7 +17,12 @@ export default function ISBNScanner({ setLoading, buttonColor = '#F08080' }: ISB
     const [bookImage, setBookImage] = useState<string | undefined>(undefined);
     const [modalVisible, setModalVisible] = useState(false);
     const [rating, setRating] = useState<number | undefined>(undefined);
+    const [pageCount, setPageCount] = useState<number | undefined>(undefined);
     const addBook = useBooksStore((state) => state.addBook);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedCode, setScannedCode] = useState('');
+    const [showSummary, setShowSummary] = useState(false);
+    const [bookData, setBookData] = useState(null);
 
     const pickImage = async () => {
         let result = await ImagePicker.launchCameraAsync({
@@ -58,6 +63,7 @@ export default function ISBNScanner({ setLoading, buttonColor = '#F08080' }: ISB
                 if (data.authors) setAuthors(data.authors);
                 if (data.rating) setRating(data.rating);
                 if (data.image) setBookImage(data.image);
+                if (data.pageCount) setPageCount(data.pageCount);
                 setModalVisible(true);
 
                 // Add the book to the store
@@ -75,15 +81,49 @@ export default function ISBNScanner({ setLoading, buttonColor = '#F08080' }: ISB
         }
     };
 
+    async function handleBarCodeScanned({ data }: { data: string }) {
+        if (isScanning) {
+            setIsScanning(false);
+            setScannedCode(data);
+            setShowSummary(true);
+
+            try {
+                const response = await fetch('http://192.168.5.37:8000/search_book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        isbn: data
+                    }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setBookData(data);
+                    if (data.pageCount) {
+                        setPageCount(data.pageCount);
+                    }
+                } else {
+                    console.error('Error searching book:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error searching book:', error);
+            }
+        }
+    }
+
     return (
         <View style={styles.container}>
-            <TouchableOpacity 
-                style={[styles.buttonContainer, { backgroundColor: buttonColor }]}
-                onPress={pickImage}
-                activeOpacity={0.7}
-            >
-                <FontAwesome name="barcode" size={34} color="white" />
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+                <TouchableOpacity 
+                    style={[styles.buttonContainer, { backgroundColor: buttonColor }]}
+                    onPress={pickImage}
+                    activeOpacity={0.7}
+                >
+                    <FontAwesome name="barcode" size={34} color="white" />
+                </TouchableOpacity>
+            </View>
 
             <SummaryModal
                 visible={modalVisible}
@@ -92,12 +132,15 @@ export default function ISBNScanner({ setLoading, buttonColor = '#F08080' }: ISB
                 title={title}
                 authors={authors}
                 image={bookImage}
+                pageCount={pageCount}
                 onClose={() => {
                     setModalVisible(false);
                     setSummary(null);
                     setTitle(undefined);
                     setAuthors(undefined);
                     setBookImage(undefined);
+                    setRating(undefined);
+                    setPageCount(undefined);
                 }}
             />
         </View>
@@ -109,6 +152,10 @@ const styles = StyleSheet.create({
         flex: 0,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 10,
     },
     buttonContainer: {
         backgroundColor: '#F08080',

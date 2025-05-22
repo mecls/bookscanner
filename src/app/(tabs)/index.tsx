@@ -1,7 +1,6 @@
-import AccessCamera from '@/src/components/AccessCamera';
 import { HelloWave } from '@/src/components/HelloWave';
-import ImagePicker from '@/src/components/ImagePicker';
 import ISBNScanner from '@/src/components/ISBNScanner';
+import ReadingStreak from '@/src/components/ReadingStreak';
 import ScansComp from '@/src/components/ScansComp';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
@@ -47,7 +46,7 @@ export default function HomeScreen() {
     <SafeAreaView style={{ flex: 1, marginTop: 40, margin: 20, backgroundColor: 'transparent' }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <ThemedView style={styles.titleContainer}>
-          <ThemedText type="title" style={{ color: 'black' }}>Hi, Mecls1</ThemedText>
+          <ThemedText type="title" style={{ color: 'black' }}>Hi, Arianna</ThemedText>
           <HelloWave />
         </ThemedView>
         <TouchableOpacity
@@ -58,6 +57,7 @@ export default function HomeScreen() {
           <Ionicons name="color-palette" size={28} color={buttonColor} />
         </TouchableOpacity>
       </View>
+      <ReadingStreak />
       <View style={styles.stepContainer}>
         <ThemedText type="subtitle" style={{ color: 'black' }}>Your last scans</ThemedText>
         <ScansComp />
@@ -65,16 +65,8 @@ export default function HomeScreen() {
       <ThemedView style={styles.stepContainer2}>
         <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
           <View style={styles.iconContainer}>
-            <ImagePicker setLoading={setLoading} buttonColor={buttonColor} />
-            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>Gallery</ThemedText>
-          </View>
-          <View style={styles.iconContainer}>
             <ISBNScanner setLoading={setLoading} buttonColor={buttonColor} />
             <ThemedText type='defaultSemiBold' style={styles.iconLabel}>ISBN</ThemedText>
-          </View>
-          <View style={styles.iconContainer}>
-            <AccessCamera setLoading={setLoading} buttonColor={buttonColor} />
-            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>Camera</ThemedText>
           </View>
         </View>
       </ThemedView>
@@ -83,7 +75,8 @@ export default function HomeScreen() {
           <Animated.View style={[styles.bounceBook, animatedStyle]}>
             <RNImage source={BOOK_IMAGE} style={{ width: 100, height: 120 }} resizeMode="cover" />
           </Animated.View>
-          <ThemedText style={styles.loadingText}>Finding your book and summary...</ThemedText>
+          <ThemedText style={styles.loadingText}>Finding and summarizing your book...</ThemedText>
+          <ThemedText style={styles.loadingText}>This won't take long...</ThemedText>
         </View>
       )}
     </SafeAreaView>
@@ -99,12 +92,12 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     flex: 2,
-    marginTop: 40,
+    marginTop: 0,
     backgroundColor: 'transparent',
     gap: 8,
   },
   stepContainer2: {
-    marginBottom: 80,
+    marginBottom: 50,
     backgroundColor: 'transparent',
     gap: 8,
     alignSelf: 'center',
