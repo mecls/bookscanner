@@ -1,17 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import { useBooksStore } from '../store/books';
+import { Book, ReadingProgress, useBooksStore } from '../store/books';
 import { ThemedText } from './ThemedText';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function ReadingStreak() {
     const [showStats, setShowStats] = useState(false);
+    const [showProgressModal, setShowProgressModal] = useState(false);
+    const [showBookProgress, setShowBookProgress] = useState(true);
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+    const [currentPage, setCurrentPage] = useState('');
+    const [totalPages, setTotalPages] = useState('');
+    const [readingTime, setReadingTime] = useState('');
     const galleryBooks = useBooksStore((state) => state.galleryBooks);
     const readingStats = useBooksStore((state) => state.readingStats);
     const updateReadingStats = useBooksStore((state) => state.updateReadingStats);
+    const updateReadingProgress = useBooksStore((state) => state.updateReadingProgress);
 
     // Memoize reading data calculations
     const { weekDays, currentStreak, longestStreak } = useMemo(() => {
@@ -102,18 +109,59 @@ export default function ReadingStreak() {
 
     const currentlyReading = useMemo(() => 
         galleryBooks.filter(book => 
-            book.status === 'to-read' && book.readingProgress
+            book.readingProgress && book.readingProgress.currentPage > 0
         ),
         [galleryBooks]
     );
+
+    function handleUpdateProgress() {
+        if (!selectedBook || !currentPage || !totalPages) return;
+
+        const currentPageNum = parseInt(currentPage);
+        const totalPagesNum = parseInt(totalPages);
+        const readingTimeNum = parseInt(readingTime) || 0;
+
+        if (currentPageNum > totalPagesNum) {
+            Alert.alert('Error', 'Current page cannot be greater than total pages');
+            return;
+        }
+
+        const progress: ReadingProgress = {
+            currentPage: currentPageNum,
+            totalPages: totalPagesNum,
+            percentage: Math.round((currentPageNum / totalPagesNum) * 100),
+            lastUpdated: new Date().toISOString(),
+            readingTime: readingTimeNum
+        };
+
+        updateReadingProgress(selectedBook.id, progress);
+        setShowProgressModal(false);
+        setCurrentPage('');
+        setReadingTime('');
+        setSelectedBook(null);
+    }
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <ThemedText type="subtitle" style={{ color: 'black', marginLeft:-20 }}>Reading Streak</ThemedText>
-                <TouchableOpacity onPress={() => setShowStats(true)}>
-                    <Ionicons name="stats-chart" size={24} color="#F08080" />
-                </TouchableOpacity>
+                <View style={styles.headerButtons}>
+                    {currentlyReading.length > 0 && (
+                        <TouchableOpacity 
+                            onPress={() => setShowBookProgress(!showBookProgress)}
+                            style={styles.toggleButton}
+                        >
+                            <Ionicons 
+                                name={showBookProgress ? "eye-off" : "eye"} 
+                                size={24} 
+                                color="#F08080" 
+                            />
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity onPress={() => setShowStats(true)}>
+                        <Ionicons name="stats-chart" size={24} color="#F08080" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.weekContainer}>
@@ -128,11 +176,24 @@ export default function ReadingStreak() {
                 ))}
             </View>
 
-            {currentlyReading.length > 0 && (
+            {showBookProgress && currentlyReading.length > 0 && (
                 <View style={styles.currentBookContainer}>
                     <ThemedText style={styles.currentBookTitle}>Currently Reading</ThemedText>
                     {currentlyReading.map(book => (
-                        <View key={book.id} style={styles.bookProgress}>
+                        <TouchableOpacity 
+                            key={book.id} 
+                            style={styles.bookProgress}
+                            onPress={() => {
+                                setSelectedBook(book);
+                                setCurrentPage(book.readingProgress?.currentPage.toString() || '');
+                                setTotalPages(book.readingProgress?.totalPages.toString() || '');
+                                setReadingTime(book.readingProgress?.readingTime.toString() || '');
+                                setShowProgressModal(true);
+                            }}
+                        >
+                            <ThemedText style={styles.bookTitle} numberOfLines={1}>
+                                {book.title}
+                            </ThemedText>
                             <View style={styles.progressBar}>
                                 <View 
                                     style={[
@@ -144,10 +205,72 @@ export default function ReadingStreak() {
                             <ThemedText style={styles.progressText}>
                                 {book.readingProgress?.currentPage || 0}/{book.readingProgress?.totalPages || 0} pages
                             </ThemedText>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </View>
             )}
+
+            {/* Progress Update Modal */}
+            <Modal
+                visible={showProgressModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowProgressModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <ThemedText type="subtitle" style={{color:'black'}}>Update Progress</ThemedText>
+                            <TouchableOpacity onPress={() => setShowProgressModal(false)}>
+                                <Ionicons name="close" size={24} color="#000" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedBook && (
+                            <View style={styles.progressForm}>
+                                <ThemedText style={styles.bookTitle}>{selectedBook.title}</ThemedText>
+                                
+                                <TextInput
+                                    style={styles.progressInput}
+                                    placeholder="Current page"
+                                    value={currentPage}
+                                    onChangeText={setCurrentPage}
+                                    keyboardType="numeric"
+                                />
+                                <TextInput
+                                    style={styles.progressInput}
+                                    placeholder="Total pages"
+                                    value={totalPages}
+                                    onChangeText={setTotalPages}
+                                    keyboardType="numeric"
+                                />
+                                <TextInput
+                                    style={styles.progressInput}
+                                    placeholder="Reading time (minutes)"
+                                    value={readingTime}
+                                    onChangeText={setReadingTime}
+                                    keyboardType="numeric"
+                                />
+                                
+                                <View style={styles.progressButtons}>
+                                    <TouchableOpacity 
+                                        style={[styles.progressButton, styles.cancelButton]}
+                                        onPress={() => setShowProgressModal(false)}
+                                    >
+                                        <ThemedText style={styles.buttonText}>Cancel</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.progressButton, styles.saveButton]}
+                                        onPress={handleUpdateProgress}
+                                    >
+                                        <ThemedText style={styles.buttonText}>Save</ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
             <Modal
                 visible={showStats}
@@ -158,7 +281,7 @@ export default function ReadingStreak() {
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <ThemedText type="title">Reading Statistics</ThemedText>
+                            <ThemedText type="subtitle" style={{color:'black'}}>Reading Statistics</ThemedText>
                             <TouchableOpacity onPress={() => setShowStats(false)}>
                                 <Ionicons name="close" size={24} color="#000" />
                             </TouchableOpacity>
@@ -268,6 +391,9 @@ const styles = StyleSheet.create({
     },
     bookProgress: {
         marginBottom: 10,
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#f8f8f8',
     },
     progressBar: {
         height: 6,
@@ -335,5 +461,52 @@ const styles = StyleSheet.create({
     chart: {
         marginVertical: 8,
         borderRadius: 16,
+    },
+    bookTitle: {
+        fontSize: 16,
+        color: '#333',
+        marginBottom: 4,
+        fontWeight: '500',
+    },
+    progressForm: {
+        padding: 15,
+    },
+    progressInput: {
+        backgroundColor: '#fff',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    progressButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginTop: 10,
+    },
+    progressButton: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#ddd',
+    },
+    saveButton: {
+        backgroundColor: '#F08080',
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    headerButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    toggleButton: {
+        padding: 4,
     },
 }); 

@@ -6,7 +6,7 @@ import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useContext } from 'react';
-import { Image as RNImage, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image as RNImage, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ColorModeContext } from './_layout';
@@ -43,33 +43,43 @@ export default function HomeScreen() {
   const buttonColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
 
   return (
-    <SafeAreaView style={{ flex: 1, marginTop: 40, margin: 20, backgroundColor: 'transparent' }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="title" style={{ color: 'black' }}>Hi, Arianna</ThemedText>
-          <HelloWave />
-        </ThemedView>
-        <TouchableOpacity
-          onPress={() => setColorMode(colorMode === 'salmon' ? 'blue' : 'salmon')}
-          style={{ padding: 8 }}
-          accessibilityLabel="Toggle button color"
-        >
-          <Ionicons name="color-palette" size={28} color={buttonColor} />
-        </TouchableOpacity>
-      </View>
-      <ReadingStreak />
-      <View style={styles.stepContainer}>
-        <ThemedText type="subtitle" style={{ color: 'black' }}>Your last scans</ThemedText>
-        <ScansComp />
-      </View>
-      <ThemedView style={styles.stepContainer2}>
-        <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
-          <View style={styles.iconContainer}>
-            <ISBNScanner setLoading={setLoading} buttonColor={buttonColor} />
-            <ThemedText type='defaultSemiBold' style={styles.iconLabel}>ISBN</ThemedText>
-          </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <ThemedView style={styles.titleContainer}>
+            <ThemedText type="title" style={{ color: 'black' }}>Hi, Arianna</ThemedText>
+            <HelloWave />
+          </ThemedView>
+          <TouchableOpacity
+            onPress={() => setColorMode(colorMode === 'salmon' ? 'blue' : 'salmon')}
+            style={{ padding: 8 }}
+            accessibilityLabel="Toggle button color"
+          >
+            <Ionicons name="color-palette" size={28} color={buttonColor} />
+          </TouchableOpacity>
         </View>
-      </ThemedView>
+
+        <ReadingStreak />
+        
+        <View style={styles.stepContainer}>
+          <ThemedText type="subtitle" style={{ color: 'black' }}>Your last scans</ThemedText>
+          <ScansComp />
+        </View>
+
+        <ThemedView style={styles.stepContainer2}>
+          <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
+            <View style={styles.iconContainer}>
+              <ISBNScanner setLoading={setLoading} buttonColor={buttonColor} />
+              <ThemedText type='defaultSemiBold' style={styles.iconLabel}>ISBN</ThemedText>
+            </View>
+          </View>
+        </ThemedView>
+      </ScrollView>
+
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
           <Animated.View style={[styles.bounceBook, animatedStyle]}>
@@ -84,6 +94,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    padding: 20,
+    paddingTop: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -91,7 +111,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepContainer: {
-    flex: 2,
+    flex: 1,
     marginTop: 0,
     backgroundColor: 'transparent',
     gap: 8,
