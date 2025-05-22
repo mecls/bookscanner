@@ -299,21 +299,29 @@ export default function GalleryScreen() {
                   {selectedBook.authors?.join(', ') || 'Unknown Author'}
                 </ThemedText>
 
-                <View style={styles.statusPickerRow}>
-                  {STATUS_OPTIONS.map(opt => (
+                <FlatList
+                  data={STATUS_OPTIONS}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.statusPickerRow}
+                  renderItem={({ item }) => (
                     <TouchableOpacity
-                      key={opt.key}
+                      key={item.key}
                       style={[
                         styles.statusOption,
-                        selectedBook.status === opt.key && styles.statusOptionSelected
+                        selectedBook.status === item.key && styles.statusOptionSelected
                       ]}
-                      onPress={() => updateBookStatus(selectedBook.id, opt.key as Book['status'])}
+                      onPress={() => {
+                        updateBookStatus(selectedBook.id, item.key as Book['status']);
+                        setSelectedBook({ ...selectedBook, status: item.key as Book['status'] });
+                      }}
                     >
-                      {opt.icon}
-                      <Text style={styles.statusOptionLabel}>{opt.label}</Text>
+                      {item.icon}
+                      <Text style={styles.statusOptionLabel}>{item.label}</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  )}
+                  keyExtractor={item => item.key}
+                />
 
                 {!selectedBook.readingProgress && !showProgressInput && (
                   <TouchableOpacity 
@@ -401,15 +409,27 @@ export default function GalleryScreen() {
                   </View>
                 )}
 
-                <TouchableOpacity 
-                  style={styles.noteButton}
-                  onPress={() => setShowNoteTaker(!showNoteTaker)}
-                >
-                  <FontAwesome name="sticky-note" size={16} color="#fff" />
-                  <ThemedText style={styles.noteButtonText}>
-                    {showNoteTaker ? 'Hide Note' : (hasExistingNote ? 'View Note' : 'Write Note')}
-                  </ThemedText>
-                </TouchableOpacity>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity 
+                    style={styles.noteButton}
+                    onPress={() => setShowNoteTaker(!showNoteTaker)}
+                  >
+                    <FontAwesome name="sticky-note" size={16} color="#fff" />
+                    <ThemedText style={styles.noteButtonText}>
+                      {showNoteTaker ? 'Hide Note' : (hasExistingNote ? 'View Note' : 'Write Note')}
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.shareButton}
+                    onPress={() => handleShareBook(selectedBook)}
+                  >
+                    <FontAwesome name="share-alt" size={16} color="#fff" />
+                    <ThemedText style={styles.shareButtonText}>
+                      Share
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
 
                 {showNoteTaker && (
                   <NoteTaker 
@@ -542,7 +562,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '90%',
+    width: '80%',
     maxHeight: '80%',
     backgroundColor: 'white',
     borderRadius: 20,
@@ -567,20 +587,21 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalImage: {
-    width: 150,
-    height: 225,
+    width: 80,
+    height: 120,
     borderRadius: 10,
     marginBottom: 15,
     alignSelf: 'center',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color:'black',
+    marginBottom: 0,
     textAlign: 'center',
   },
   modalAuthor: {
-    fontSize: 18,
+    fontSize: 14,
     color: '#666',
     marginBottom: 20,
     textAlign: 'center',
@@ -667,6 +688,12 @@ const styles = StyleSheet.create({
   filterButtonSelected: {
     backgroundColor: '#F08080',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 8,
+  },
   noteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -674,29 +701,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    marginVertical: 8,
     gap: 6,
-    alignSelf: 'center',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F08080',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
   },
   noteButtonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 12,
   },
+  shareButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
   statusPickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 10,
-    marginLeft:10,
-    gap: 5,
+    paddingHorizontal: 10,
+    gap: 8,
+    marginBottom: 15,
   },
   statusOption: {
     flexDirection: 'column',
     alignItems: 'center',
     padding: 8,
     borderRadius: 10,
-    marginHorizontal: 2,
     backgroundColor: 'transparent',
   },
   statusOptionSelected: {
