@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Dimensions, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { Alert, Dimensions, Modal, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Book, ReadingProgress, useBooksStore } from '../store/books';
+import ReadingStats from './ReadingStats';
 import { ThemedText } from './ThemedText';
 
 const screenWidth = Dimensions.get('window').width;
@@ -286,53 +286,8 @@ export default function ReadingStreak() {
                                 <Ionicons name="close" size={24} color="#000" />
                             </TouchableOpacity>
                         </View>
+                        <ReadingStats />
 
-                        <ScrollView style={styles.statsContainer}>
-                            <View style={styles.statItem}>
-                                <ThemedText style={styles.statLabel}>Current Streak</ThemedText>
-                                <ThemedText style={styles.statValue}>{readingStats.currentStreak} days</ThemedText>
-                            </View>
-
-                            <View style={styles.statItem}>
-                                <ThemedText style={styles.statLabel}>Longest Streak</ThemedText>
-                                <ThemedText style={styles.statValue}>{readingStats.longestStreak} days</ThemedText>
-                            </View>
-
-                            <View style={styles.statItem}>
-                                <ThemedText style={styles.statLabel}>Books Read This Year</ThemedText>
-                                <ThemedText style={styles.statValue}>{readingStats.yearlyBooksRead}</ThemedText>
-                            </View>
-
-                            <View style={styles.statItem}>
-                                <ThemedText style={styles.statLabel}>Total Books Read</ThemedText>
-                                <ThemedText style={styles.statValue}>{readingStats.totalBooksRead}</ThemedText>
-                            </View>
-
-                            <View style={styles.chartContainer}>
-                                <ThemedText style={styles.chartTitle}>Weekly Reading Time</ThemedText>
-                                <LineChart
-                                    data={{
-                                        labels: weekDays.map(day => day.day),
-                                        datasets: [{
-                                            data: weekDays.map(day => day.readingTime)
-                                        }]
-                                    }}
-                                    width={screenWidth - 60}
-                                    height={220}
-                                    chartConfig={{
-                                        backgroundColor: '#ffffff',
-                                        backgroundGradientFrom: '#ffffff',
-                                        backgroundGradientTo: '#ffffff',
-                                        decimalPlaces: 0,
-                                        color: (opacity = 1) => `rgba(240, 128, 128, ${opacity})`,
-                                        style: {
-                                            borderRadius: 16
-                                        }
-                                    }}
-                                    style={styles.chart}
-                                />
-                            </View>
-                        </ScrollView>
                     </View>
                 </View>
             </Modal>
