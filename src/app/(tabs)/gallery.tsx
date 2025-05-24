@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ColorModeContext } from './_layout';
 
 const EMPTY_BOOK_IMAGE = require('@/assets/images/book.png');
@@ -277,170 +277,179 @@ export default function GalleryScreen() {
         transparent={true}
         onRequestClose={() => setSelectedBook(null)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setSelectedBook(null)}
-            >
-              <FontAwesome name="close" size={24} color="black" />
-            </TouchableOpacity>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setSelectedBook(null)}
+              >
+                <FontAwesome name="close" size={24} color="black" />
+              </TouchableOpacity>
 
-            {selectedBook && (
-              <ScrollView style={styles.modalScroll}>
-                <Image
-                  source={{ uri: selectedBook.image }}
-                  style={styles.modalImage}
-                />
-                <ThemedText style={styles.modalTitle}>
-                  {selectedBook.title}
-                </ThemedText>
-                <ThemedText style={styles.modalAuthor}>
-                  {selectedBook.authors?.join(', ') || 'Unknown Author'}
-                </ThemedText>
+              {selectedBook && (
+                <ScrollView 
+                  style={styles.modalScroll}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 100 }}
+                >
+                  <Image
+                    source={{ uri: selectedBook.image }}
+                    style={styles.modalImage}
+                  />
+                  <ThemedText style={styles.modalTitle}>
+                    {selectedBook.title}
+                  </ThemedText>
+                  <ThemedText style={styles.modalAuthor}>
+                    {selectedBook.authors?.join(', ') || 'Unknown Author'}
+                  </ThemedText>
 
-                <FlatList
-                  data={STATUS_OPTIONS}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.statusPickerRow}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      key={item.key}
-                      style={[
-                        styles.statusOption,
-                        selectedBook.status === item.key && styles.statusOptionSelected
-                      ]}
-                      onPress={() => {
-                        updateBookStatus(selectedBook.id, item.key as Book['status']);
-                        setSelectedBook({ ...selectedBook, status: item.key as Book['status'] });
-                      }}
+                  <FlatList
+                    data={STATUS_OPTIONS}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.statusPickerRow}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        key={item.key}
+                        style={[
+                          styles.statusOption,
+                          selectedBook.status === item.key && styles.statusOptionSelected
+                        ]}
+                        onPress={() => {
+                          updateBookStatus(selectedBook.id, item.key as Book['status']);
+                          setSelectedBook({ ...selectedBook, status: item.key as Book['status'] });
+                        }}
+                      >
+                        {item.icon}
+                        <Text style={styles.statusOptionLabel}>{item.label}</Text>
+                      </TouchableOpacity>
+                    )}
+                    keyExtractor={item => item.key}
+                  />
+
+                  {!selectedBook.readingProgress && !showProgressInput && (
+                    <TouchableOpacity 
+                      style={styles.updateProgressButton}
+                      onPress={() => setShowProgressInput(true)}
                     >
-                      {item.icon}
-                      <Text style={styles.statusOptionLabel}>{item.label}</Text>
+                      <ThemedText style={styles.updateProgressButtonText}>
+                        Start Reading
+                      </ThemedText>
                     </TouchableOpacity>
                   )}
-                  keyExtractor={item => item.key}
-                />
 
-                {!selectedBook.readingProgress && !showProgressInput && (
-                  <TouchableOpacity 
-                    style={styles.updateProgressButton}
-                    onPress={() => setShowProgressInput(true)}
-                  >
-                    <ThemedText style={styles.updateProgressButtonText}>
-                      Start Reading
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
-
-                {(selectedBook.readingProgress || showProgressInput) && (
-                  <View style={styles.progressSection}>
-                    {selectedBook.readingProgress && !showProgressInput && (
-                      <View>
-                        <View style={styles.progressBar}>
-                          <View 
-                            style={[
-                              styles.progressFill,
-                              { width: `${selectedBook.readingProgress.percentage}%` }
-                            ]} 
-                          />
-                        </View>
-                        <ThemedText style={styles.progressText}>
-                          {selectedBook.readingProgress.currentPage}/{selectedBook.readingProgress.totalPages} pages ({selectedBook.readingProgress.percentage}%)
-                        </ThemedText>
-                        <ThemedText style={styles.progressText}>
-                          Reading time: {selectedBook.readingProgress.readingTime} minutes
-                        </ThemedText>
-                        <TouchableOpacity 
-                          style={styles.updateProgressButton}
-                          onPress={() => setShowProgressInput(true)}
-                        >
-                          <ThemedText style={styles.updateProgressButtonText}>
-                            Update Progress
+                  {(selectedBook.readingProgress || showProgressInput) && (
+                    <View style={styles.progressSection}>
+                      {selectedBook.readingProgress && !showProgressInput && (
+                        <View>
+                          <View style={styles.progressBar}>
+                            <View 
+                              style={[
+                                styles.progressFill,
+                                { width: `${selectedBook.readingProgress.percentage}%` }
+                              ]} 
+                            />
+                          </View>
+                          <ThemedText style={styles.progressText}>
+                            {selectedBook.readingProgress.currentPage}/{selectedBook.readingProgress.totalPages} pages ({selectedBook.readingProgress.percentage}%)
                           </ThemedText>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-
-                    {showProgressInput && (
-                      <View style={styles.progressInputContainer}>
-                        <TextInput
-                          style={styles.progressInput}
-                          placeholder="Current page"
-                          value={currentPage}
-                          onChangeText={setCurrentPage}
-                          keyboardType="numeric"
-                        />
-                        <TextInput
-                          style={styles.progressInput}
-                          placeholder="Total pages"
-                          value={totalPages}
-                          onChangeText={setTotalPages}
-                          keyboardType="numeric"
-                        />
-                        <TextInput
-                          style={styles.progressInput}
-                          placeholder="Reading time (minutes)"
-                          value={readingTime}
-                          onChangeText={setReadingTime}
-                          keyboardType="numeric"
-                        />
-                        <View style={styles.progressInputButtons}>
+                          <ThemedText style={styles.progressText}>
+                            Reading time: {selectedBook.readingProgress.readingTime} minutes
+                          </ThemedText>
                           <TouchableOpacity 
-                            style={[styles.progressInputButton, styles.cancelButton]}
-                            onPress={() => setShowProgressInput(false)}
+                            style={styles.updateProgressButton}
+                            onPress={() => setShowProgressInput(true)}
                           >
-                            <ThemedText style={styles.progressInputButtonText}>
-                              Cancel
-                            </ThemedText>
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={[styles.progressInputButton, styles.saveButton]}
-                            onPress={handleUpdateProgress}
-                          >
-                            <ThemedText style={styles.progressInputButtonText}>
-                              Save
+                            <ThemedText style={styles.updateProgressButtonText}>
+                              Update Progress
                             </ThemedText>
                           </TouchableOpacity>
                         </View>
-                      </View>
-                    )}
+                      )}
+
+                      {showProgressInput && (
+                        <View style={styles.progressInputContainer}>
+                          <TextInput
+                            style={styles.progressInput}
+                            placeholder="Current page"
+                            value={currentPage}
+                            onChangeText={setCurrentPage}
+                            keyboardType="numeric"
+                          />
+                          <TextInput
+                            style={styles.progressInput}
+                            placeholder="Total pages"
+                            value={totalPages}
+                            onChangeText={setTotalPages}
+                            keyboardType="numeric"
+                          />
+                          <TextInput
+                            style={styles.progressInput}
+                            placeholder="Reading time (minutes)"
+                            value={readingTime}
+                            onChangeText={setReadingTime}
+                            keyboardType="numeric"
+                          />
+                          <View style={styles.progressInputButtons}>
+                            <TouchableOpacity 
+                              style={[styles.progressInputButton, styles.cancelButton]}
+                              onPress={() => setShowProgressInput(false)}
+                            >
+                              <ThemedText style={styles.progressInputButtonText}>
+                                Cancel
+                              </ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={[styles.progressInputButton, styles.saveButton]}
+                              onPress={handleUpdateProgress}
+                            >
+                              <ThemedText style={styles.progressInputButtonText}>
+                                Save
+                              </ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity 
+                      style={styles.noteButton}
+                      onPress={() => setShowNoteTaker(!showNoteTaker)}
+                    >
+                      <FontAwesome name="sticky-note" size={16} color="#fff" />
+                      <ThemedText style={styles.noteButtonText}>
+                        {showNoteTaker ? 'Hide Note' : (hasExistingNote ? 'View Note' : 'Write Note')}
+                      </ThemedText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.shareButton}
+                      onPress={() => handleShareBook(selectedBook)}
+                    >
+                      <FontAwesome name="share-alt" size={16} color="#fff" />
+                      <ThemedText style={styles.shareButtonText}>
+                        Share
+                      </ThemedText>
+                    </TouchableOpacity>
                   </View>
-                )}
 
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity 
-                    style={styles.noteButton}
-                    onPress={() => setShowNoteTaker(!showNoteTaker)}
-                  >
-                    <FontAwesome name="sticky-note" size={16} color="#fff" />
-                    <ThemedText style={styles.noteButtonText}>
-                      {showNoteTaker ? 'Hide Note' : (hasExistingNote ? 'View Note' : 'Write Note')}
-                    </ThemedText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.shareButton}
-                    onPress={() => handleShareBook(selectedBook)}
-                  >
-                    <FontAwesome name="share-alt" size={16} color="#fff" />
-                    <ThemedText style={styles.shareButtonText}>
-                      Share
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-
-                {showNoteTaker && (
-                  <NoteTaker 
-                    bookKey={selectedBook.id} 
-                    onNoteStatusChange={setHasExistingNote}
-                  />
-                )}
-              </ScrollView>
-            )}
+                  {showNoteTaker && (
+                    <NoteTaker 
+                      bookKey={selectedBook.id} 
+                      onNoteStatusChange={setHasExistingNote}
+                    />
+                  )}
+                </ScrollView>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
