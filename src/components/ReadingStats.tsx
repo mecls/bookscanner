@@ -1,14 +1,21 @@
+import { ColorModeContext } from '@/src/app/(tabs)/_layout';
+import { Colors } from '@/src/constants/Colors';
 import { FontAwesome } from '@expo/vector-icons';
-import React, { useMemo } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useBooksStore } from '../store/books';
 import { ThemedText } from './ThemedText';
 
 export default function ReadingStats() {
   const galleryBooks = useBooksStore((state) => state.galleryBooks);
+  const { colorMode } = useContext(ColorModeContext);
+
+  const fabColor = colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange;
 
   const stats = useMemo(() => {
-    const readBooks = galleryBooks.filter(book => book.status === 'read');
+    const readBooks = galleryBooks.filter(book => 
+      book.status === 'read' || book.status === 'amazing' || book.status === 'horrible'
+    );
     const totalBooks = galleryBooks.length;
     const totalPages = readBooks.reduce((sum, book) => 
       sum + (book.readingProgress?.totalPages || 0), 0);
@@ -48,37 +55,37 @@ export default function ReadingStats() {
     <View style={styles.container}>      
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
-          <FontAwesome name="book" size={24} color="#F08080" />
+          <FontAwesome name="book" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{stats.totalBooks}</ThemedText>
           <ThemedText style={styles.statLabel}>Total Books</ThemedText>
         </View>
 
         <View style={styles.statCard}>
-          <FontAwesome name="check-circle" size={24} color="#F08080" />
+          <FontAwesome name="check-circle" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{stats.readBooks}</ThemedText>
           <ThemedText style={styles.statLabel}>Books Read</ThemedText>
         </View>
 
         <View style={styles.statCard}>
-          <FontAwesome name="file-text" size={24} color="#F08080" />
+          <FontAwesome name="file-text" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{stats.pagesRead}</ThemedText>
           <ThemedText style={styles.statLabel}>Pages Read</ThemedText>
         </View>
 
         <View style={styles.statCard}>
-          <FontAwesome name="clock-o" size={24} color="#F08080" />
+          <FontAwesome name="clock-o" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{Math.round(stats.totalReadingTime / 60)}h</ThemedText>
           <ThemedText style={styles.statLabel}>Reading Time</ThemedText>
         </View>
 
         <View style={styles.statCard}>
-          <FontAwesome name="tachometer" size={24} color="#F08080" />
+          <FontAwesome name="tachometer" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{stats.avgReadingSpeed}</ThemedText>
           <ThemedText style={styles.statLabel}>Pages/Hour</ThemedText>
         </View>
 
         <View style={styles.statCard}>
-          <FontAwesome name="percent" size={24} color="#F08080" />
+          <FontAwesome name="percent" size={24} color={fabColor} />
           <ThemedText style={styles.statValue}>{stats.completionRate}%</ThemedText>
           <ThemedText style={styles.statLabel}>Completion</ThemedText>
         </View>

@@ -1,5 +1,7 @@
+import { ColorModeContext } from '@/src/app/(tabs)/_layout';
+import { Colors } from '@/src/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface NoteTakerProps {
@@ -10,6 +12,7 @@ interface NoteTakerProps {
 export default function NoteTaker({ bookKey, onNoteStatusChange }: NoteTakerProps) {
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState(false);
+  const { colorMode } = useContext(ColorModeContext);
   const storageKey = `book-note-${bookKey}`;
 
   useEffect(() => {
@@ -46,7 +49,14 @@ export default function NoteTaker({ bookKey, onNoteStatusChange }: NoteTakerProp
         onSubmitEditing={() => Keyboard.dismiss()}
       />
       <View style={styles.row}>
-        <TouchableOpacity style={styles.saveButton} onPress={saveNote} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={[
+            styles.saveButton, 
+            { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+          ]} 
+          onPress={saveNote} 
+          activeOpacity={0.8}
+        >
           <Text style={styles.saveButtonText}>{saved ? 'Saved!' : 'Save Note'}</Text>
         </TouchableOpacity>
       </View>

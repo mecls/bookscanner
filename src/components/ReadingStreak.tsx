@@ -1,6 +1,8 @@
+import { Colors } from '@/src/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Dimensions, Modal, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ColorModeContext } from '../app/(tabs)/_layout';
 import { Book, ReadingProgress, useBooksStore } from '../store/books';
 import ReadingStats from './ReadingStats';
 import { ThemedText } from './ThemedText';
@@ -19,6 +21,7 @@ export default function ReadingStreak() {
     const readingStats = useBooksStore((state) => state.readingStats);
     const updateReadingStats = useBooksStore((state) => state.updateReadingStats);
     const updateReadingProgress = useBooksStore((state) => state.updateReadingProgress);
+    const { colorMode } = useContext(ColorModeContext);
 
     // Memoize reading data calculations
     const { weekDays, currentStreak, longestStreak } = useMemo(() => {
@@ -89,11 +92,12 @@ export default function ReadingStreak() {
     const { booksReadThisYear, totalBooksRead } = useMemo(() => {
         const currentYear = new Date().getFullYear();
         const booksReadThisYear = galleryBooks.filter(book => 
-            book.status === 'read' && book.yearRead === currentYear
+            (book.status === 'read' || book.status === 'amazing' || book.status === 'horrible') && 
+            book.yearRead === currentYear
         ).length;
 
         const totalBooksRead = galleryBooks.filter(book => 
-            book.status === 'read'
+            book.status === 'read' || book.status === 'amazing' || book.status === 'horrible'
         ).length;
 
         return { booksReadThisYear, totalBooksRead };
@@ -109,7 +113,12 @@ export default function ReadingStreak() {
 
     const currentlyReading = useMemo(() => 
         galleryBooks.filter(book => 
-            book.readingProgress && book.readingProgress.currentPage > 0
+            book.readingProgress && 
+            book.readingProgress.currentPage > 0 && 
+            book.readingProgress.currentPage < book.readingProgress.totalPages && 
+            book.status !== 'read' && 
+            book.status !== 'amazing' && 
+            book.status !== 'horrible'
         ),
         [galleryBooks]
     );
@@ -154,12 +163,16 @@ export default function ReadingStreak() {
                             <Ionicons 
                                 name={showBookProgress ? "eye-off" : "eye"} 
                                 size={24} 
-                                color="#F08080" 
+                                color={colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange} 
                             />
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity onPress={() => setShowStats(true)}>
-                        <Ionicons name="stats-chart" size={24} color="#F08080" />
+                        <Ionicons 
+                            name="stats-chart" 
+                            size={24} 
+                            color={colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange} 
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -170,7 +183,7 @@ export default function ReadingStreak() {
                         <ThemedText style={styles.dayText}>{day.day}</ThemedText>
                         <View style={[
                             styles.dayIndicator,
-                            day.read && styles.dayRead
+                            day.read && { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
                         ]} />
                     </View>
                 ))}
@@ -198,7 +211,10 @@ export default function ReadingStreak() {
                                 <View 
                                     style={[
                                         styles.progressFill,
-                                        { width: `${book.readingProgress?.percentage || 0}%` }
+                                        { 
+                                            width: `${book.readingProgress?.percentage || 0}%`,
+                                            backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange
+                                        }
                                     ]} 
                                 />
                             </View>
@@ -260,7 +276,11 @@ export default function ReadingStreak() {
                                         <ThemedText style={styles.buttonText}>Cancel</ThemedText>
                                     </TouchableOpacity>
                                     <TouchableOpacity 
-                                        style={[styles.progressButton, styles.saveButton]}
+                                        style={[
+                                            styles.progressButton, 
+                                            styles.saveButton,
+                                            { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                                        ]}
                                         onPress={handleUpdateProgress}
                                     >
                                         <ThemedText style={styles.buttonText}>Save</ThemedText>

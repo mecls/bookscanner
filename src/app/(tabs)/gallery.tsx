@@ -1,17 +1,16 @@
 import NoteTaker from '@/src/components/NoteTaker';
 import { ThemedText } from '@/src/components/ThemedText';
+import { Colors } from '@/src/constants/Colors';
 import { Book, ReadingProgress, useBooksStore } from '@/src/store/books';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ColorModeContext } from './_layout';
 
 const EMPTY_BOOK_IMAGE = require('@/assets/images/book.png');
-const SALMON = '#F08080';
-const LIGHT_BLUE = '#7EC8E3';
 
 const STATUS_OPTIONS = [
   { key: 'read', label: 'Read', icon: <Ionicons name="checkmark-done-circle" size={22} color="#3498db" /> },
@@ -28,7 +27,7 @@ export default function GalleryScreen() {
   const setGalleryBooks = useBooksStore.setState;
   const navigation = useNavigation();
   const { colorMode } = useContext(ColorModeContext);
-  const fabColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
+  const fabColor = colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange;
   const [statusModal, setStatusModal] = useState<{ visible: boolean; bookId?: string }>({ visible: false });
   const [bookDetailModal, setBookDetailModal] = useState<{ visible: boolean; book?: Book }>({ visible: false });
   const [selectedStatus, setSelectedStatus] = useState<Book['status'] | null>(null);
@@ -40,6 +39,7 @@ export default function GalleryScreen() {
   const [totalPages, setTotalPages] = useState('');
   const [readingTime, setReadingTime] = useState('');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [isAddingBook, setIsAddingBook] = useState(false);
 
   // Add button in header
   useFocusEffect(
@@ -66,30 +66,65 @@ export default function GalleryScreen() {
   }, [selectedBook]);
 
   function updateBookStatus(id: string, status: Book['status']) {
+    const book = galleryBooks.find(b => b.id === id);
+    if (!book) return;
+
+    const currentYear = new Date().getFullYear();
+    const readingStats = useBooksStore.getState().readingStats;
+    const updateReadingStats = useBooksStore.getState().updateReadingStats;
+
+    // Calculate changes in reading stats
+    let booksReadChange = 0;
+    let pagesReadChange = 0;
+
+    if (status === 'read' && book.status !== 'read') {
+      // Book is being marked as read
+      booksReadChange = 1;
+      if (book.readingProgress) {
+        pagesReadChange = book.readingProgress.totalPages;
+      }
+    } else if (status !== 'read' && book.status === 'read') {
+      // Book is being unmarked as read
+      booksReadChange = -1;
+      if (book.readingProgress) {
+        pagesReadChange = -book.readingProgress.totalPages;
+      }
+    }
+
+    // Update the book status
     useBooksStore.getState().updateBookStatus(id, status);
+
+    // Update reading stats
+    updateReadingStats({
+      yearlyBooksRead: readingStats.yearlyBooksRead + booksReadChange,
+      yearlyPagesRead: readingStats.yearlyPagesRead + pagesReadChange,
+    });
   }
 
   async function handleAddBook() {
+    setIsAddingBook(true);
     let result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images', 'videos'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
+    
     if (!result.canceled) {
       try {
-        // Call your backend to extract and summarize book info
         const formData = new FormData();
         formData.append('file', {
           uri: result.assets[0].uri,
           name: 'book.jpg',
           type: 'image/jpeg',
         } as any);
+        
         const response = await fetch('http://192.168.5.37:8000/extract_and_summarize', {
           method: 'POST',
           body: formData,
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        
         if (!response.ok) throw new Error('Failed to fetch book data');
         const data = await response.json();
         addGalleryBook({
@@ -100,7 +135,11 @@ export default function GalleryScreen() {
         });
       } catch (error) {
         Alert.alert('Error', 'Could not add book.');
+      } finally {
+        setIsAddingBook(false);
       }
+    } else {
+      setIsAddingBook(false);
     }
   }
 
@@ -208,7 +247,12 @@ export default function GalleryScreen() {
         <View style={{ flex: 1, backgroundColor: 'transparent', marginTop: 60, marginLeft: 0 }}>
           <View style={styles.filterRow}>
             <TouchableOpacity
-              style={[styles.filterButton, !selectedStatus && styles.filterButtonSelected]}
+              style={[
+                styles.filterButton, 
+                !selectedStatus && { 
+                  backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange 
+                }
+              ]}
               onPress={() => setSelectedStatus(null)}
             >
               <Ionicons name="apps" size={20} color={!selectedStatus ? "#fff" : "#888"} />
@@ -333,7 +377,10 @@ export default function GalleryScreen() {
 
                   {!selectedBook.readingProgress && !showProgressInput && (
                     <TouchableOpacity 
-                      style={styles.updateProgressButton}
+                      style={[
+                        styles.updateProgressButton,
+                        { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                      ]}
                       onPress={() => setShowProgressInput(true)}
                     >
                       <ThemedText style={styles.updateProgressButtonText}>
@@ -350,7 +397,10 @@ export default function GalleryScreen() {
                             <View 
                               style={[
                                 styles.progressFill,
-                                { width: `${selectedBook.readingProgress.percentage}%` }
+                                { 
+                                  width: `${selectedBook.readingProgress.percentage}%`,
+                                  backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange
+                                }
                               ]} 
                             />
                           </View>
@@ -361,7 +411,10 @@ export default function GalleryScreen() {
                             Reading time: {selectedBook.readingProgress.readingTime} minutes
                           </ThemedText>
                           <TouchableOpacity 
-                            style={styles.updateProgressButton}
+                            style={[
+                              styles.updateProgressButton,
+                              { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                            ]}
                             onPress={() => setShowProgressInput(true)}
                           >
                             <ThemedText style={styles.updateProgressButtonText}>
@@ -404,7 +457,11 @@ export default function GalleryScreen() {
                               </ThemedText>
                             </TouchableOpacity>
                             <TouchableOpacity 
-                              style={[styles.progressInputButton, styles.saveButton]}
+                              style={[
+                                styles.progressInputButton, 
+                                styles.saveButton,
+                                { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                              ]}
                               onPress={handleUpdateProgress}
                             >
                               <ThemedText style={styles.progressInputButtonText}>
@@ -419,7 +476,10 @@ export default function GalleryScreen() {
 
                   <View style={styles.buttonRow}>
                     <TouchableOpacity 
-                      style={styles.noteButton}
+                      style={[
+                        styles.noteButton,
+                        { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                      ]}
                       onPress={() => setShowNoteTaker(!showNoteTaker)}
                     >
                       <FontAwesome name="sticky-note" size={16} color="#fff" />
@@ -429,7 +489,10 @@ export default function GalleryScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity 
-                      style={styles.shareButton}
+                      style={[
+                        styles.shareButton,
+                        { backgroundColor: colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange }
+                      ]}
                       onPress={() => handleShareBook(selectedBook)}
                     >
                       <FontAwesome name="share-alt" size={16} color="#fff" />
@@ -451,6 +514,15 @@ export default function GalleryScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Add loading overlay */}
+      {isAddingBook && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange} />
+            <ThemedText style={styles.loadingText}>Processing your book...</ThemedText>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -750,5 +822,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#222',
     marginTop: 2,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContent: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#333',
   },
 });

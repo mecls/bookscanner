@@ -28,6 +28,9 @@ interface ReadingStats {
     yearlyBooksRead: number;
     dailyReadingTime: number; // in minutes
     lastReadDate: string;
+    yearlyBooksGoal: number;
+    yearlyPagesGoal: number;
+    yearlyPagesRead: number;
 }
 
 interface BooksStore {
@@ -78,6 +81,9 @@ export const useBooksStore = create<BooksStore>()(
                 yearlyBooksRead: 0,
                 dailyReadingTime: 0,
                 lastReadDate: new Date().toISOString(),
+                yearlyBooksGoal: 12,
+                yearlyPagesGoal: 5000,
+                yearlyPagesRead: 0,
             },
             updateReadingStats: (stats) => set((state) => ({
                 readingStats: { ...state.readingStats, ...stats }

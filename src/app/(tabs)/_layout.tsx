@@ -4,21 +4,19 @@ import { Platform } from 'react-native';
 
 import { HapticTab } from '@/src/components/HapticTab';
 import { IconSymbol } from '@/src/components/ui/IconSymbol';
+import { Colors } from '@/src/constants/Colors';
 import { useColorScheme } from '@/src/hooks/useColorScheme';
 
-export type ColorMode = 'salmon' | 'blue';
+export type ColorMode = 'salmon' | 'orange';
 export const ColorModeContext = createContext<{
   colorMode: ColorMode;
   setColorMode: (mode: ColorMode) => void;
 }>({ colorMode: 'salmon', setColorMode: () => {} });
 
-const SALMON = '#F08080';
-const LIGHT_BLUE = '#7EC8E3';
-
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [colorMode, setColorMode] = useState<ColorMode>('salmon');
-  const activeColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
+  const activeColor = colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange;
 
   return (
     <ColorModeContext.Provider value={{ colorMode, setColorMode }}>

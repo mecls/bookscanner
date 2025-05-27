@@ -4,17 +4,14 @@ import ReadingStreak from '@/src/components/ReadingStreak';
 import ScansComp from '@/src/components/ScansComp';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
+import { Colors } from '@/src/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useContext } from 'react';
-import { Image as RNImage, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring } from 'react-native-reanimated';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ColorModeContext } from './_layout';
 
-const BOOK_IMAGE = require('@/assets/images/book.png'); // Place a book icon in assets/images/book.png
-
-const SALMON = '#F08080';
-const LIGHT_BLUE = '#7EC8E3';
 
 export default function HomeScreen() {
   const [loading, setLoading] = React.useState(false);
@@ -40,7 +37,7 @@ export default function HomeScreen() {
     transform: [{ translateY: bounce.value }],
   }));
 
-  const buttonColor = colorMode === 'salmon' ? SALMON : LIGHT_BLUE;
+  const buttonColor = colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -51,11 +48,11 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <ThemedView style={styles.titleContainer}>
-            <ThemedText type="title" style={{ color: 'black' }}>Hi, Arianna</ThemedText>
+            <ThemedText type="title" style={{ color: 'black' }}>Hi, leugim</ThemedText>
             <HelloWave />
           </ThemedView>
           <TouchableOpacity
-            onPress={() => setColorMode(colorMode === 'salmon' ? 'blue' : 'salmon')}
+            onPress={() => setColorMode(colorMode === 'salmon' ? 'orange' : 'salmon')}
             style={{ padding: 8 }}
             accessibilityLabel="Toggle button color"
           >
@@ -71,7 +68,7 @@ export default function HomeScreen() {
         </View>
 
         <ThemedView style={styles.stepContainer2}>
-          <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={styles.iconContainer}>
               <ISBNScanner setLoading={setLoading} buttonColor={buttonColor} />
               <ThemedText type='defaultSemiBold' style={styles.iconLabel}>ISBN</ThemedText>
@@ -82,11 +79,15 @@ export default function HomeScreen() {
 
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
-          <Animated.View style={[styles.bounceBook, animatedStyle]}>
-            <RNImage source={BOOK_IMAGE} style={{ width: 100, height: 120 }} resizeMode="cover" />
-          </Animated.View>
-          <ThemedText style={styles.loadingText}>Finding and summarizing your book...</ThemedText>
-          <ThemedText style={styles.loadingText}>This won't take long...</ThemedText>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator 
+              size="large" 
+              color={colorMode === 'salmon' ? Colors.light.salmon : Colors.light.lightOrange} 
+              style={styles.loadingSpinner}
+            />
+            <ThemedText style={styles.loadingText}>Finding and summarizing your book...</ThemedText>
+            <ThemedText style={styles.loadingText}>This won't take long...</ThemedText>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -117,7 +118,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepContainer2: {
-    marginBottom: 50,
+    marginTop: 30,
+    marginBottom: 30,
     backgroundColor: 'transparent',
     gap: 8,
     alignSelf: 'center',
@@ -146,19 +148,36 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
+  },
+  loadingContent: {
+    alignItems: 'center',
+    padding: 20,
     borderRadius: 20,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   bounceBook: {
     marginBottom: 20,
   },
+  loadingSpinner: {
+    marginVertical: 20,
+  },
   loadingText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#333',
-    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });
 
