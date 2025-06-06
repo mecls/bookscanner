@@ -6,6 +6,7 @@ import { HapticTab } from '@/src/components/HapticTab';
 import { IconSymbol } from '@/src/components/ui/IconSymbol';
 import { Colors } from '@/src/constants/Colors';
 import { useColorScheme } from '@/src/hooks/useColorScheme';
+import Feather from '@expo/vector-icons/build/Feather';
 
 export type ColorMode = 'salmon' | 'orange';
 export const ColorModeContext = createContext<{
@@ -49,7 +50,7 @@ export default function TabLayout() {
           name="gallery"
           options={{
             title: 'Gallery',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
+            tabBarIcon: ({ color }) => <Feather name="book-open" size={24} color={color} />,
           }}
         />
       </Tabs>

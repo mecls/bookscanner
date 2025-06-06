@@ -1,7 +1,10 @@
+import '@/src/config/firebase'; // Import Firebase config
+import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 
@@ -26,6 +29,42 @@ const DarkTheme = {
   },
 };
 
+function RootLayoutNav() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.replace('onboarding' as any);
+      } else {
+        router.replace('/(tabs)' as any);
+      }
+    }
+  }, [user, loading]);
+
+  if (loading) {
+    return null;
+  }
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : LightTheme}>
+      <View style={{ flex: 1, backgroundColor: '#F5F5F0' }}>
+        <Stack screenOptions={{ 
+          contentStyle: { backgroundColor: '#F5F5F0' },
+        }}>
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </View>
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
@@ -38,16 +77,8 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : LightTheme}>
-      <View style={{ flex: 1, backgroundColor: '#F5F5F0' }}>
-        <Stack screenOptions={{ 
-          contentStyle: { backgroundColor: '#F5F5F0' },
-        }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </View>
-    </ThemeProvider>
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }
